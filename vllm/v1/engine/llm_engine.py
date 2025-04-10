@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
+import torch
+
 from collections.abc import Mapping
 from copy import copy
 from typing import Any, Callable, Optional, Union
@@ -176,6 +178,7 @@ class LLMEngine:
         request_id: str,
         prompt: PromptType,
         params: Union[SamplingParams, PoolingParams],
+        his_emb: Optional[torch.Tensor],
         arrival_time: Optional[float] = None,
         lora_request: Optional[LoRARequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
@@ -184,8 +187,8 @@ class LLMEngine:
     ) -> None:
         # Process raw inputs into the request.
         request = self.processor.process_inputs(request_id, prompt, params,
-                                                arrival_time, lora_request,
-                                                trace_headers,
+                                                his_emb, arrival_time,
+                                                lora_request, trace_headers,
                                                 prompt_adapter_request,
                                                 priority)
 

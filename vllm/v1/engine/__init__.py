@@ -5,6 +5,7 @@ import time
 from collections.abc import Sequence
 from typing import Any, Optional, Union
 
+import torch
 import msgspec
 
 from vllm.lora.request import LoRARequest
@@ -53,6 +54,7 @@ class EngineCoreRequest(
     # Detokenizer, but set to None when it is added to EngineCoreClient.
     prompt: Optional[str]
     prompt_token_ids: list[int]
+    his_emb: Optional[torch.Tensor]
     mm_inputs: Optional[Sequence[Optional[MultiModalKwargs]]]
     mm_hashes: Optional[list[str]]
     mm_placeholders: Optional[list[PlaceholderRange]]

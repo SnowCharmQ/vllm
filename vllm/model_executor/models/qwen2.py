@@ -496,6 +496,59 @@ class Qwen2ForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
         return loader.load_weights(weights)
 
 
+class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
+    def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
+        super().__init__(vllm_config=vllm_config, prefix=prefix)
+        mult_k = 4
+        self.emb_hidden_size = 1536
+        self.align_mlp = nn.Sequential(nn.Linear(self.emb_hidden_size, self.config.hidden_size * mult_k), 
+                                            nn.GELU(), 
+                                            nn.Linear(self.config.hidden_size * mult_k, 
+                                                      self.config.hidden_size))
+        self.align_mlp_inst = nn.Sequential(nn.Linear(self.emb_hidden_size, self.config.hidden_size * mult_k), 
+                                                nn.GELU(), 
+                                                nn.Linear(self.config.hidden_size * mult_k, 
+                                                          self.config.hidden_size))
+        self.inst_token = nn.Parameter(torch.rand(self.emb_hidden_size), requires_grad=True)
+        for layer in self.align_mlp_inst:
+            if isinstance(layer, nn.Linear):
+                torch.nn.init.xavier_uniform_(layer.weight)
+                if layer.bias is not None:
+                    torch.nn.init.zeros_(layer.bias)
+        for layer in self.align_mlp:
+            if isinstance(layer, nn.Linear):
+                torch.nn.init.xavier_uniform_(layer.weight)
+                if layer.bias is not None:
+                    torch.nn.init.zeros_(layer.bias)
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        positions: torch.Tensor,
+        intermediate_tensors: Optional[IntermediateTensors] = None,
+        inputs_embeds: Optional[torch.Tensor] = None,
+        his_emb: Optional[torch.Tensor] = None,
+    ) -> Union[torch.Tensor, IntermediateTensors]:
+        inputs_embeds = self.get_input_embeddings(input_ids)
+        if his_emb is not None:
+            profile_emb = self.align_mlp(his_emb)
+            inst_emb = self.align_mlp_inst(self.inst_token)
+            special_token_mask = (input_ids == self.config.vocab_size-1) | (input_ids == self.config.vocab_size-2)
+            non_special_embs = inputs_embeds[~special_token_mask]
+            input_embs_norm = non_special_embs.norm(dim=-1, keepdim=True).mean()
+            profile_emb = profile_emb * (input_embs_norm / (profile_emb.norm(dim=-1, keepdim=True) + 1e-6))
+            inst_emb = inst_emb * (input_embs_norm / (inst_emb.norm(dim=-1, keepdim=True) + 1e-6))
+            profile_token_idx = input_ids == self.config.vocab_size-1
+            inst_token_idx = input_ids == self.config.vocab_size-2
+            inputs_embeds[profile_token_idx] = profile_emb.to(inputs_embeds.dtype)[profile_token_idx]
+            inputs_embeds[inst_token_idx] = inst_emb.to(inputs_embeds.dtype)
+        hidden_states = self.model(input_ids,
+                                   positions, 
+                                   intermediate_tensors,
+                                   inputs_embeds)
+        return hidden_states
+
+
 class Qwen2EmbeddingModel(nn.Module, SupportsLoRA, SupportsPP):
     packed_modules_mapping = {
         "qkv_proj": [
