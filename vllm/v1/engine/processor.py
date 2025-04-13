@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import time
+import torch
 from typing import Mapping, Optional, Union
 
 from vllm.config import CacheConfig, LoRAConfig, ModelConfig
@@ -88,6 +89,7 @@ class Processor:
         request_id: str,
         prompt: PromptType,
         params: Union[SamplingParams, PoolingParams],
+        his_emb: Optional[torch.Tensor] = None,
         arrival_time: Optional[float] = None,
         lora_request: Optional[LoRARequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
@@ -224,6 +226,7 @@ class Processor:
             request_id=request_id,
             prompt=decoder_inputs.prompt,
             prompt_token_ids=decoder_inputs.prompt_token_ids,
+            his_emb=his_emb,
             mm_inputs=sorted_mm_inputs,
             mm_hashes=sorted_mm_hashes,
             mm_placeholders=sorted_mm_positions,

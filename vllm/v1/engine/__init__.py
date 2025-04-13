@@ -4,6 +4,7 @@ import enum
 import time
 from typing import Any, List, Optional, Union
 
+import torch
 import msgspec
 
 from vllm.lora.request import LoRARequest
@@ -52,6 +53,7 @@ class EngineCoreRequest(
     # Detokenizer, but set to None when it is added to EngineCoreClient.
     prompt: Optional[str]
     prompt_token_ids: List[int]
+    his_emb: Optional[torch.Tensor]
     mm_inputs: Optional[List[Optional[MultiModalKwargs]]]
     mm_hashes: Optional[List[str]]
     mm_placeholders: Optional[List[PlaceholderRange]]
@@ -59,7 +61,6 @@ class EngineCoreRequest(
     eos_token_id: Optional[int]
     arrival_time: float
     lora_request: Optional[LoRARequest]
-
 
 class EngineCoreEventType(enum.IntEnum):
     """The type of engine core request event."""

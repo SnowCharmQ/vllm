@@ -26,6 +26,7 @@ class CachedRequestState:
     req_id: str
     prompt_token_ids: List[int]
     prompt: Optional[str]
+    his_emb: Optional[torch.Tensor]
     mm_inputs: List[MultiModalKwargs]
     mm_positions: List["PlaceholderRange"]
     sampling_params: SamplingParams
@@ -198,6 +199,10 @@ class InputBatch:
         # This is updated each time the batch constituents change.
         self.sampling_metadata = self._make_sampling_metadata()
 
+        self.his_emb = torch.empty((max_num_reqs, 1536),
+                            dtype=torch.bfloat16,
+                            device=device)
+
     @property
     def req_ids(self) -> List[str]:
         # None elements should only be present transiently
@@ -298,6 +303,9 @@ class InputBatch:
             # No LoRA
             self.request_lora_mapping[req_index] = 0
 
+        if request.his_emb is not None:
+            self.his_emb[req_index] = request.his_emb
+
     def remove_request(self, req_id: str) -> Optional[int]:
         """This method must always be followed by a call to condense()."""
 
@@ -319,6 +327,7 @@ class InputBatch:
         self.generators.pop(req_index, None)
         self.num_logprobs.pop(req_id, None)
         self.num_prompt_logprobs.pop(req_id, None)
+        self.his_emb[req_index] = None
 
         # LoRA
         lora_id = self.request_lora_mapping[req_index]
@@ -397,6 +406,8 @@ class InputBatch:
                 last_req_index]
 
             self.logit_bias[empty_index] = self.logit_bias[last_req_index]
+
+            self.his_emb[empty_index] = self.his_emb[last_req_index]
 
             # Decrement last_req_index since it is now empty.
             last_req_index -= 1

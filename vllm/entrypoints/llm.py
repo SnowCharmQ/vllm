@@ -379,6 +379,8 @@ class LLM:
         self,
         prompts: Union[Union[PromptType, Sequence[PromptType]],
                        Optional[Union[str, List[str]]]] = None,
+        his_embs: Optional[Union[torch.Tensor, 
+                                 Sequence[torch.Tensor]]] = None,
         sampling_params: Optional[Union[SamplingParams,
                                         Sequence[SamplingParams]]] = None,
         prompt_token_ids: Optional[Union[List[int], List[List[int]]]] = None,
@@ -461,6 +463,7 @@ class LLM:
         self._validate_and_add_requests(
             prompts=parsed_prompts,
             params=sampling_params,
+            his_embs=his_embs,
             lora_request=lora_request,
             prompt_adapter_request=prompt_adapter_request,
             guided_options=guided_options_request,
@@ -1294,6 +1297,8 @@ class LLM:
                       Sequence[PoolingParams]],
         lora_request: Optional[Union[Sequence[LoRARequest], LoRARequest]],
         prompt_adapter_request: Optional[PromptAdapterRequest],
+        his_embs: Optional[Union[torch.Tensor, 
+                            Sequence[torch.Tensor]]] = None,
         guided_options: Optional[GuidedDecodingRequest] = None,
         priority: Optional[List[int]] = None,
     ) -> None:
@@ -1326,10 +1331,11 @@ class LLM:
                 sp.output_kind = RequestOutputKind.FINAL_ONLY
 
         # Add requests to the engine.
-        for i, prompt in enumerate(prompts):
+        for i in range(num_requests):
             self._add_request(
-                prompt,
+                prompts[i],
                 params[i] if isinstance(params, Sequence) else params,
+                his_emb=his_embs[i] if his_embs else None,
                 lora_request=lora_request[i] if isinstance(
                     lora_request, Sequence) else lora_request,
                 prompt_adapter_request=prompt_adapter_request,
@@ -1340,6 +1346,7 @@ class LLM:
         self,
         prompt: PromptType,
         params: Union[SamplingParams, PoolingParams],
+        his_emb: Optional[torch.Tensor] = None,
         lora_request: Optional[LoRARequest] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
         priority: int = 0,
@@ -1349,6 +1356,7 @@ class LLM:
             request_id,
             prompt,
             params,
+            his_emb=his_emb,
             lora_request=lora_request,
             prompt_adapter_request=prompt_adapter_request,
             priority=priority,
