@@ -47,10 +47,12 @@ def test_filter_subtensors():
 
 @pytest.fixture(scope="module")
 def llama_3p2_1b_files():
-    input_dir = snapshot_download("meta-llama/Llama-3.2-1B-Instruct",
-                                  ignore_patterns=["*.bin*", "original/*"])
+    with TemporaryDirectory() as cache_dir:
+        input_dir = snapshot_download("meta-llama/Llama-3.2-1B-Instruct",
+                                      cache_dir=cache_dir,
+                                      ignore_patterns=["*.bin*", "original/*"])
 
-    yield input_dir
+        yield input_dir
 
 
 def _run_writer(input_dir, output_dir, weights_patterns, **kwargs):
@@ -62,9 +64,9 @@ def _run_writer(input_dir, output_dir, weights_patterns, **kwargs):
 
     # Copy metadata files to output directory
     for file in os.listdir(input_dir):
-        if os.path.isdir(os.path.join(input_dir, file)):
-            continue
-        if not any(file.endswith(ext) for ext in weights_patterns):
+        if not any(
+                file.endswith(ext) and not os.path.isdir(file)
+                for ext in weights_patterns):
             shutil.copy(f"{input_dir}/{file}", output_dir)
 
 
@@ -79,8 +81,7 @@ def _run_generate(input_dir, queue: mp.Queue, **kwargs):
 @pytest.mark.parametrize("enable_lora", [False, True])
 @pytest.mark.parametrize("tp_size", [1, 2])
 def test_sharded_state_loader(enable_lora, tp_size, num_gpus_available,
-                              llama_3p2_1b_files,
-                              monkeypatch: pytest.MonkeyPatch):
+                              llama_3p2_1b_files):
     if num_gpus_available < tp_size:
         pytest.skip(f"Not enough GPUs for tensor parallelism {tp_size}")
 
@@ -88,8 +89,6 @@ def test_sharded_state_loader(enable_lora, tp_size, num_gpus_available,
     gpu_memory_utilization = 0.8
     input_dir = llama_3p2_1b_files
     ctx = mp.get_context("spawn")
-    # The interface in v1 engine has changed, run in v1 engine will hang.
-    monkeypatch.setenv("VLLM_USE_V1", "0")
 
     # Run in separate processes for memory & CUDA isolation
     with TemporaryDirectory() as output_dir:

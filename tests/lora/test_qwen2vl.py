@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 from dataclasses import dataclass
-from typing import Optional
+from typing import Dict, List, Optional
 
 import pytest
 from packaging.version import Version
@@ -12,14 +12,6 @@ from vllm.lora.request import LoRARequest
 from vllm.platforms import current_platform
 
 
-@pytest.fixture(autouse=not current_platform.is_cpu())
-def v1(run_with_both_engines_lora):
-    # Simple autouse wrapper to run both engines for each test
-    # This can be promoted up to conftest.py to run for every
-    # test in a package
-    pass
-
-
 @dataclass
 class TestConfig:
     model_path: str
@@ -28,7 +20,7 @@ class TestConfig:
     max_loras: int = 2
     max_lora_rank: int = 16
     max_model_len: int = 4096
-    mm_processor_kwargs: Optional[dict[str, int]] = None
+    mm_processor_kwargs: Optional[Dict[str, int]] = None
 
     def __post_init__(self):
         if self.mm_processor_kwargs is None:
@@ -65,11 +57,11 @@ class Qwen2VLTester:
         )
 
     def run_test(self,
-                 images: list[ImageAsset],
-                 expected_outputs: list[str],
+                 images: List[ImageAsset],
+                 expected_outputs: List[str],
                  lora_id: Optional[int] = None,
                  temperature: float = 0,
-                 max_tokens: int = 5) -> list[str]:
+                 max_tokens: int = 5) -> List[str]:
 
         sampling_params = vllm.SamplingParams(
             temperature=temperature,

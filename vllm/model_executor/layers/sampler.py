@@ -1187,8 +1187,7 @@ def _build_sampler_output(
         deferred_sample_results_args=deferred_sample_results_args)
 
 
-def _get_next_prompt_tokens(
-        seq_group: SequenceGroupToSample) -> tuple[int, ...]:
+def _get_next_prompt_tokens(seq_group: SequenceGroupToSample) -> List[int]:
     """Get a list of next prompt tokens to compute logprob from a
         given sequence group.
 

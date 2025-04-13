@@ -12,11 +12,8 @@ supported_hardware
 auto_awq
 bnb
 gguf
-gptqmodel
 int4
 int8
 fp8
-quark
 quantized_kvcache
-torchao
 :::

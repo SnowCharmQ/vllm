@@ -16,6 +16,8 @@ Further update the model as follows:
         self,
         input_ids: torch.Tensor,
         positions: torch.Tensor,
+        kv_caches: List[torch.Tensor],
+        attn_metadata: AttentionMetadata,
   +     pixel_values: torch.Tensor,
     ) -> SamplerOutput:
   ```
@@ -34,8 +36,7 @@ Further update the model as follows:
             image_features = self.vision_encoder(image_input)
             return self.multi_modal_projector(image_features)
 
-        def get_multimodal_embeddings(
-                self, **kwargs: object) -> Optional[MultiModalEmbeddings]:
+        def get_multimodal_embeddings(self, **kwargs: object) -> Optional[NestedTensors]:
 
             # Validate the multimodal input keyword arguments
             image_input = self._parse_and_validate_image_input(**kwargs)
@@ -62,7 +63,7 @@ Further update the model as follows:
         def get_input_embeddings(
             self,
             input_ids: torch.Tensor,
-            multimodal_embeddings: Optional[MultiModalEmbeddings] = None,
+            multimodal_embeddings: Optional[NestedTensors] = None,
         ) -> torch.Tensor:
 
             # `get_input_embeddings` should already be implemented for the language 
@@ -77,17 +78,6 @@ Further update the model as follows:
                     placeholder_token_id=self.config.image_token_index)
 
             return inputs_embeds
-    ```
-
-- Implement {meth}`~vllm.model_executor.models.interfaces.SupportsMultiModal.get_language_model` getter to provide stable access to the underlying language model.
-
-    ```python
-    class YourModelForImage2Seq(nn.Module):
-        ...
-
-        def get_language_model(self) -> torch.nn.Module:
-            # Change `language_model` according to your implementation.
-            return self.language_model
     ```
 
 - Once the above steps are done, update the model class with the {class}`~vllm.model_executor.models.interfaces.SupportsMultiModal` interface.
@@ -121,21 +111,17 @@ def get_supported_mm_limits(self) -> Mapping[str, Optional[int]]:
     return {"image": None, "video": 1}
 ```
 
-## 3. Specify dummy inputs
+### Maximum number of placeholder feature tokens
 
-Then, inherit {class}`~vllm.multimodal.profiling.BaseDummyInputsBuilder` to construct dummy inputs for
-HF processing as well as memory profiling.
+Also, override the abstract method {meth}`~vllm.multimodal.processing.BaseProcessingInfo.get_mm_max_tokens_per_item`
+to return the maximum number of placeholder feature tokens per input item for each modality.
 
-### For memory profiling
+When calling the model, the output embeddings from the visual encoder are assigned to the input positions
+containing placeholder feature tokens. Therefore, the number of placeholder feature tokens should be equal
+to the size of the output embeddings.
 
-Override the abstract method {meth}`~vllm.multimodal.profiling.BaseDummyInputsBuilder.get_dummy_processor_inputs`
-to construct dummy inputs for memory profiling. This dummy input should result in the worst-case memory usage of
-the model so that vLLM can reserve the correct amount of memory for it.
-
-Assuming that the memory usage increases with the number of tokens, the dummy input can be constructed to maximize the number of output embeddings, which is the same number as placeholder feature tokens.
-
-::::{tab-set}
-:::{tab-item} Basic example: LLaVA
+:::::{tab-set}
+::::{tab-item} Basic example: LLaVA
 :sync: llava
 
 Looking at the code of HF's `LlavaForConditionalGeneration`:
@@ -244,7 +230,7 @@ def get_num_image_tokens(
 ```
 
 Notice that the number of image tokens doesn't depend on the image width and height.
-We can simply use a dummy `image_size`:
+So, we can calculate the maximum number of image tokens using any image size:
 
 ```python
 def get_image_size_with_most_features(self) -> ImageSize:
@@ -252,35 +238,33 @@ def get_image_size_with_most_features(self) -> ImageSize:
     width = height = hf_config.image_size
     return ImageSize(width=width, height=height)
 
-def get_dummy_processor_inputs(
-    self,
-    seq_len: int,
-    mm_counts: Mapping[str, int],
-) -> ProcessorInputs:
-    num_images = mm_counts.get("image", 0)
+def get_max_image_tokens(self) -> int:
+    target_width, target_height = self.get_image_size_with_most_features()
 
-    processor = self.info.get_hf_processor()
-    image_token = processor.image_token
-  
-    hf_config = self.get_hf_config()
-    target_width, target_height = self.info.get_image_size_with_most_features()
-
-    mm_data = {
-        "image":
-        self._get_dummy_images(width=target_width,
-                               height=target_height,
-                               num_images=num_images)
-    }
-
-    return ProcessorInputs(
-        prompt_text=image_token * num_images,
-        mm_data=mm_data,
+    return self.get_num_image_tokens(
+        image_width=target_width,
+        image_height=target_height,
     )
 ```
 
+And thus, we can override the method as:
+
+```python
+def get_mm_max_tokens_per_item(
+    self,
+    seq_len: int,
+    mm_counts: Mapping[str, int],
+) -> Mapping[str, int]:
+    return {"image": self.get_max_image_tokens()}
+```
+
+:::{note}
+Our [actual code](gh-file:vllm/model_executor/models/llava.py) is more abstracted to support vision encoders other than CLIP.
 :::
 
-:::{tab-item} No input placeholders: Fuyu
+::::
+
+::::{tab-item} Non-consecutive feature tokens: Fuyu
 :sync: fuyu
 
 Looking at the code of HF's `FuyuForCausalLM`:
@@ -400,15 +384,187 @@ num_patches_per_dim_w = image_width // patch_width
 num_patches = num_patches_per_dim_h * num_patches_per_dim_w
 ```
 
-These image patches correspond to placeholder tokens (`|SPEAKER|`). So, we just need to maximize the number of image patches. Since input images are first resized
-to fit within `image_processor.size`, we can maximize the number of image patches by inputting an image with size equal to `image_processor.size`.
+We can calculate this in vLLM using this code:
+
+```python
+def get_num_image_patches(
+    self,
+    *,
+    image_width: int,
+    image_height: int,
+) -> int:
+    image_processor = self.get_image_processor()
+    target_width = image_processor.size["width"]
+    target_height = image_processor.size["height"]
+    patch_width = image_processor.patch_size["width"]
+    patch_height = image_processor.patch_size["height"]
+
+    if not (image_width <= target_width and image_height <= target_height):
+        height_scale_factor = target_height / image_height
+        width_scale_factor = target_width / image_width
+        optimal_scale_factor = min(height_scale_factor, width_scale_factor)
+
+        image_height = int(image_height * optimal_scale_factor)
+        image_width = int(image_width * optimal_scale_factor)
+
+    ncols = math.ceil(image_width / patch_width)
+    nrows = math.ceil(image_height / patch_height)
+    return ncols * nrows
+```
+
+These image patches correspond to placeholder tokens (`|SPEAKER|`). However, the processor also
+inserts newline tokens (`|NEWLINE|`) as shown here:
+
+```python
+# https://github.com/huggingface/transformers/blob/v4.48.3/src/transformers/models/fuyu/image_processing_fuyu.py#L654-L670
+tensor_of_image_ids = torch.full(
+    [num_patches], image_placeholder_id, dtype=torch.int32, device=image_input.device
+)
+patches = self.patchify_image(image=image.unsqueeze(0)).squeeze(0)
+assert num_patches == patches.shape[0]
+
+if variable_sized:
+    # Now terminate each line with |NEWLINE|.
+    tensor_of_image_ids = tensor_of_image_ids.reshape(-1, image_width // patch_width)
+    newline_ids = torch.full(
+        [tensor_of_image_ids.shape[0], 1],
+        image_newline_id,
+        dtype=torch.int32,
+        device=image_input.device,
+    )
+    tensor_of_image_ids = torch.cat([tensor_of_image_ids, newline_ids], dim=1)
+    tensor_of_image_ids = tensor_of_image_ids.reshape(-1)
+```
+
+So, the layout of tokens for an image is:
+
+```
+|SPEAKER||SPEAKER|...|SPEAKER||NEWLINE|
+|SPEAKER||SPEAKER|...|SPEAKER||NEWLINE|
+...
+|SPEAKER||SPEAKER|...|SPEAKER||NEWLINE|
+```
+
+This makes the placeholder tokens non-consecutive in the prompt.
+Since vLLM requires the feature tokens to be consecutive, **we also treat the newline tokens as feature tokens**.
+
+So overall, the total number of feature tokens is
+
+```python
+def get_num_image_tokens(
+    self,
+    *,
+    image_width: int,
+    image_height: int,
+) -> int:
+    image_processor = self.get_image_processor()
+    target_width = image_processor.size["width"]
+    target_height = image_processor.size["height"]
+    patch_width = image_processor.patch_size["width"]
+    patch_height = image_processor.patch_size["height"]
+
+    if not (image_width <= target_width and image_height <= target_height):
+        height_scale_factor = target_height / image_height
+        width_scale_factor = target_width / image_width
+        optimal_scale_factor = min(height_scale_factor, width_scale_factor)
+
+        image_height = int(image_height * optimal_scale_factor)
+        image_width = int(image_width * optimal_scale_factor)
+
+    ncols = math.ceil(image_width / patch_width)
+    nrows = math.ceil(image_height / patch_height)
+    return (ncols + 1) * nrows
+```
+
+To calculate the maximum number of image tokens, recall that input images are first resized
+to fit within `image_processor.size`. The maximum possible dimensions of the image before
+being converted into patches is therefore equal to `image_processor.size`.
 
 ```python
 def get_image_size_with_most_features(self) -> ImageSize:
     image_processor = self.get_image_processor()
     return ImageSize(width=image_processor.size["width"],
                         height=image_processor.size["height"])
+
+def get_max_image_tokens(self) -> int:
+    target_width, target_height = self.get_image_size_with_most_features()
+
+    return self.get_num_image_tokens(
+        image_width=target_width,
+        image_height=target_height,
+    )
 ```
+
+And thus, we can override the method as:
+
+```python
+def get_mm_max_tokens_per_item(
+    self,
+    seq_len: int,
+    mm_counts: Mapping[str, int],
+) -> Mapping[str, int]:
+    return {"image": self.get_max_image_tokens()}
+```
+
+:::{note}
+Our [actual code](gh-file:vllm/model_executor/models/fuyu.py) returns `ncols` and `nrows` directly instead of the total token count.
+This is because `ncols` and `nrows` are used to specify the layout of the feature tokens (as shown in Step 4 of this guide).
+:::
+
+::::
+:::::
+
+## 3. Specify dummy inputs
+
+Then, inherit {class}`~vllm.multimodal.profiling.BaseDummyInputsBuilder` to construct dummy inputs for
+HF processing as well as memory profiling.
+
+### For memory profiling
+
+Override the abstract method {meth}`~vllm.multimodal.profiling.BaseDummyInputsBuilder.get_dummy_processor_inputs`
+to construct dummy inputs for memory profiling. This dummy input should result in the worst-case memory usage of
+the model so that vLLM can reserve the correct amount of memory for it.
+
+Assuming that the memory usage increases with the number of tokens, the dummy input can be constructed based
+on the code for {meth}`~vllm.multimodal.processing.BaseProcessingInfo.get_mm_max_tokens_per_item`.
+
+::::{tab-set}
+:::{tab-item} Basic example: LLaVA
+:sync: llava
+
+Making use of the `get_image_size_with_most_features` method implemented in Step 2:
+
+```python
+def get_dummy_processor_inputs(
+    self,
+    seq_len: int,
+    mm_counts: Mapping[str, int],
+) -> ProcessorInputs:
+    num_images = mm_counts.get("image", 0)
+
+    processor = self.info.get_hf_processor()
+    image_token = processor.image_token
+  
+    hf_config = self.get_hf_config()
+    target_width, target_height = self.info.get_image_size_with_most_features()
+
+    mm_data = {
+        "image":
+        self._get_dummy_images(width=target_width,
+                               height=target_height,
+                               num_images=num_images)
+    }
+
+    return ProcessorInputs(
+        prompt_text=image_token * num_images,
+        mm_data=mm_data,
+    )
+```
+
+:::
+
+:::{tab-item} No input placeholders: Fuyu
+:sync: fuyu
 
 Fuyu does not expect image placeholders in the inputs to HF processor, so
 the dummy prompt text is empty regardless of the number of images.
@@ -566,13 +722,13 @@ def _get_mm_fields_config(
 
 :::::
 
-### Prompt updates
+### Prompt replacements
 
-Override {meth}`~vllm.multimodal.processing.BaseMultiModalProcessor._get_prompt_updates` to
-return a list of {class}`~vllm.multimodal.processing.PromptUpdate` instances.
+Override {meth}`~vllm.multimodal.processing.BaseMultiModalProcessor._get_prompt_replacements` to
+return a list of {class}`~vllm.multimodal.processing.PromptReplacement` instances.
 
-Each {class}`~vllm.multimodal.processing.PromptUpdate` instance specifies an update operation
-(e.g.: insertion, replacement) performed by the HF processor.
+Each {class}`~vllm.multimodal.processing.PromptReplacement` instance specifies a find-and-replace
+operation performed by the HF processor.
 
 ::::{tab-set}
 :::{tab-item} Basic example: LLaVA
@@ -589,15 +745,15 @@ for sample in text:
 ```
 
 It simply repeats each input `image_token` a number of times equal to the number of placeholder feature tokens (`num_image_tokens`).
-Based on this, we override {meth}`~vllm.multimodal.processing.BaseMultiModalProcessor._get_prompt_updates` as follows:
+Based on this, we override {meth}`~vllm.multimodal.processing.BaseMultiModalProcessor._get_prompt_replacements` as follows:
 
 ```python
-def _get_prompt_updates(
+def _get_prompt_replacements(
     self,
     mm_items: MultiModalDataItems,
     hf_processor_mm_kwargs: Mapping[str, object],
     out_mm_kwargs: MultiModalKwargs,
-) -> Sequence[PromptUpdate]:
+) -> list[PromptReplacement]:
     hf_config = self.info.get_hf_config()
     image_token_id = hf_config.image_token_index
 
@@ -705,8 +861,8 @@ prompt_tokens, prompts_length = _tokenize_prompts_with_image_and_batch(
 )
 ```
 
-To assign the vision embeddings to only the image tokens, instead of a string
-you can return an instance of {class}`~vllm.multimodal.processing.PromptUpdateDetails`:
+To accommodate this, instead of a string you can return an instance of `PromptReplacementDetails`
+with different `full` and `feature` attributes:
 
 ```python
 hf_config = self.info.get_hf_config()
@@ -724,9 +880,9 @@ def get_replacement_fuyu(item_idx: int):
     image_tokens = ([_IMAGE_TOKEN_ID] * ncols +
                     [_NEWLINE_TOKEN_ID]) * nrows
 
-    return PromptUpdateDetails.select_token_id(
-        image_tokens + [bos_token_id],
-        embed_token_id=_IMAGE_TOKEN_ID,
+    return PromptReplacementDetails(
+        full=image_tokens + [bos_token_id],
+        features=image_tokens,
     )
 ```
 
@@ -734,12 +890,12 @@ Finally, noticing that the HF processor removes the `|ENDOFTEXT|` token from the
 we can search for it to conduct the replacement at the start of the string:
 
 ```python
-def _get_prompt_updates(
+def _get_prompt_replacements(
     self,
     mm_items: MultiModalDataItems,
     hf_processor_mm_kwargs: Mapping[str, object],
     out_mm_kwargs: MultiModalKwargs,
-) -> Sequence[PromptUpdate]:
+) -> list[PromptReplacement]:
     hf_config = self.info.get_hf_config()
     bos_token_id = hf_config.bos_token_id
     assert isinstance(bos_token_id, int)
@@ -759,9 +915,9 @@ def _get_prompt_updates(
         image_tokens = ([_IMAGE_TOKEN_ID] * ncols +
                         [_NEWLINE_TOKEN_ID]) * nrows
 
-        return PromptUpdateDetails.select_token_id(
-            image_tokens + [bos_token_id],
-            embed_token_id=_IMAGE_TOKEN_ID,
+        return PromptReplacementDetails(
+            full=image_tokens + [bos_token_id],
+            features=image_tokens,
         )
 
     return [
@@ -794,35 +950,3 @@ to register them to the multi-modal registry:
 +                                         dummy_inputs=YourDummyInputsBuilder)
   class YourModelForImage2Seq(nn.Module, SupportsMultiModal):
 ```
-
-## Notes
-
-### Inserting feature tokens without replacement
-
-Some HF processors directly insert feature tokens without replacing anything in the original prompt. In that case, you can use {class}`~vllm.multimodal.processing.PromptInsertion` instead of {class}`~vllm.multimodal.processing.PromptReplacement` inside {meth}`~vllm.multimodal.processing.BaseMultiModalProcessor._get_prompt_updates`.
-
-Examples:
-
-- BLIP-2 (insert at start of prompt): <gh-file:vllm/model_executor/models/blip2.py>
-- Florence2 (insert at start of prompt): <gh-file:vllm/model_executor/models/florence2.py>
-- Molmo (insert after `<|endoftext|>` token): <gh-file:vllm/model_executor/models/molmo.py>
-
-### Handling prompt updates unrelated to multi-modal data
-
-{meth}`~vllm.multimodal.processing.BaseMultiModalProcessor._get_prompt_updates` assumes that each application of prompt update corresponds to one multi-modal item. If the HF processor performs additional processing regardless of how many multi-modal items there are, you should override {meth}`~vllm.multimodal.processing.BaseMultiModalProcessor._apply_hf_processor_tokens_only` so that the processed token inputs are consistent with the result of applying the HF processor on text inputs. This is because token inputs bypass the HF processor according to [our design](#mm-processing).
-
-Examples:
-
-- Chameleon (appends `sep_token`): <gh-file:vllm/model_executor/models/chameleon.py>
-- Fuyu (appends `boa_token`): <gh-file:vllm/model_executor/models/fuyu.py>
-- Molmo (applies chat template which is not defined elsewhere): <gh-file:vllm/model_executor/models/molmo.py>
-
-### Custom HF processor
-
-Some models don't define a HF processor class on HF Hub. In that case, you can define a custom HF processor that has the same call signature as HF processors and pass it to {meth}`~vllm.multimodal.processing.BaseMultiModalProcessor._call_hf_processor`.
-
-Examples:
-
-- DeepSeek-VL2: <gh-file:vllm/model_executor/models/deepseek_vl2.py>
-- InternVL: <gh-file:vllm/model_executor/models/internvl.py>
-- Qwen-VL: <gh-file:vllm/model_executor/models/qwen_vl.py>

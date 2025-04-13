@@ -1,4 +1,4 @@
-You can create a new Python environment using [conda](https://docs.conda.io/projects/conda/en/stable/user-guide/getting-started.html):
+You can create a new Python environment using `conda`:
 
 ```console
 # (Recommended) Create a new conda environment.

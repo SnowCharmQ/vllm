@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
+from typing import List
 from unittest.mock import MagicMock
 
 import pytest  # noqa
@@ -45,7 +46,7 @@ def test_simple():
     cache_config.num_cpu_blocks = 8
     cache_config.num_gpu_blocks = 8
     scheduler = Scheduler(scheduler_config, cache_config, None)
-    running: list[SequenceGroup] = []
+    running: List[SequenceGroup] = []
 
     # Add seq groups to scheduler.
     for i in range(num_seq_group):
@@ -92,7 +93,7 @@ def test_chunk():
     cache_config.num_cpu_blocks = 32
     cache_config.num_gpu_blocks = 32
     scheduler = Scheduler(scheduler_config, cache_config, None)
-    running: list[SequenceGroup] = []
+    running: List[SequenceGroup] = []
 
     # Add seq groups to scheduler.
     for i in range(2):
@@ -144,7 +145,7 @@ def test_concurrent_chunking():
     cache_config.num_cpu_blocks = 32
     cache_config.num_gpu_blocks = 32
     scheduler = Scheduler(scheduler_config, cache_config, None)
-    running: list[SequenceGroup] = []
+    running: List[SequenceGroup] = []
 
     # Add seq groups to scheduler.
     for i in range(2):
@@ -225,8 +226,8 @@ def test_short_prompts_jump_long_prompts_in_queue():
     cache_config.num_cpu_blocks = 3200  # large KV cache size for large requests
     cache_config.num_gpu_blocks = 3200
     scheduler = Scheduler(scheduler_config, cache_config, None)
-    long_seqs: list[SequenceGroup] = []
-    short_seqs: list[SequenceGroup] = []
+    long_seqs: List[SequenceGroup] = []
+    short_seqs: List[SequenceGroup] = []
 
     # Add 2 large seq groups to scheduler.
     for i in range(2):
@@ -367,7 +368,7 @@ def test_complex():
     cache_config.num_cpu_blocks = 64
     cache_config.num_gpu_blocks = 64
     scheduler = Scheduler(scheduler_config, cache_config, None)
-    running: list[SequenceGroup] = []
+    running: List[SequenceGroup] = []
 
     # Add seq groups to scheduler.
     for i in range(2):
@@ -438,7 +439,7 @@ def test_maximal_decoding():
     cache_config.num_cpu_blocks = 8
     cache_config.num_gpu_blocks = 8
     scheduler = Scheduler(scheduler_config, cache_config, None)
-    running: list[SequenceGroup] = []
+    running: List[SequenceGroup] = []
 
     # Add seq groups to scheduler.
     for i in range(2):
@@ -532,7 +533,7 @@ def test_prompt_limit():
     cache_config.num_cpu_blocks = 16
     cache_config.num_gpu_blocks = 16
     scheduler = Scheduler(scheduler_config, cache_config, None)
-    running: list[SequenceGroup] = []
+    running: List[SequenceGroup] = []
 
     _, seq_group = create_dummy_prompt("1",
                                        prompt_length=48,
@@ -564,7 +565,7 @@ def test_prompt_limit_exceed():
     cache_config.num_cpu_blocks = 16
     cache_config.num_gpu_blocks = 16
     scheduler = Scheduler(scheduler_config, cache_config, None)
-    running: list[SequenceGroup] = []
+    running: List[SequenceGroup] = []
     _, seq_group = create_dummy_prompt("2",
                                        prompt_length=48,
                                        block_size=block_size)
@@ -698,7 +699,7 @@ def test_chunked_prefill_max_seqs():
     cache_config.num_cpu_blocks = 128
     cache_config.num_gpu_blocks = 128
     scheduler = Scheduler(scheduler_config, cache_config, None)
-    running: list[SequenceGroup] = []
+    running: List[SequenceGroup] = []
 
     _, seq_group = create_dummy_prompt("1",
                                        prompt_length=65,
@@ -757,7 +758,7 @@ def test_prefix_caching():
     cache_config.num_cpu_blocks = 0
     cache_config.num_gpu_blocks = 32
     scheduler = Scheduler(scheduler_config, cache_config, None)
-    running: list[SequenceGroup] = []
+    running: List[SequenceGroup] = []
 
     # Add seq groups to scheduler.
     for i in range(2):
@@ -799,7 +800,7 @@ def test_prefix_caching_with_concurrent_partial_prefills():
     cache_config.num_cpu_blocks = 0
     cache_config.num_gpu_blocks = 32
     scheduler = Scheduler(scheduler_config, cache_config, None)
-    running: list[SequenceGroup] = []
+    running: List[SequenceGroup] = []
 
     # Add seq groups to scheduler.
     for i in range(2):

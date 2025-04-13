@@ -32,17 +32,20 @@ def set_default_torch_dtype(dtype: torch.dtype):
 
 def is_transformers_impl_compatible(
         arch: str,
-        module: Optional["transformers.PreTrainedModel"] = None) -> bool:
+        module: Optional[transformers.PreTrainedModel] = None) -> bool:
     mod = module or getattr(transformers, arch, None)
     if mod is None:
         return False
-    return mod.is_backend_compatible()
+    if hasattr(mod, "supports_backend"):
+        return mod.is_backend_compatible()
+    else:
+        return mod._supports_flex_attn
 
 
-def resolve_transformers_arch(model_config: ModelConfig,
-                              architectures: list[str]):
+def resolve_transformers_fallback(model_config: ModelConfig,
+                                  architectures: list[str]):
     for i, arch in enumerate(architectures):
-        if arch == "TransformersForCausalLM":
+        if arch == "TransformersModel":
             continue
         auto_map: dict[str, str] = getattr(model_config.hf_config, "auto_map",
                                            None) or dict()
@@ -66,18 +69,17 @@ def resolve_transformers_arch(model_config: ModelConfig,
                 raise ValueError(
                     f"The Transformers implementation of {arch} is not "
                     "compatible with vLLM.")
-            architectures[i] = "TransformersForCausalLM"
+            architectures[i] = "TransformersModel"
         if model_config.model_impl == ModelImpl.AUTO:
             if not is_transformers_impl_compatible(arch, custom_model_module):
                 raise ValueError(
                     f"{arch} has no vLLM implementation and the Transformers "
-                    "implementation is not compatible with vLLM. Try setting "
-                    "VLLM_USE_V1=0.")
+                    "implementation is not compatible with vLLM.")
             logger.warning(
                 "%s has no vLLM implementation, falling back to Transformers "
                 "implementation. Some features may not be supported and "
                 "performance may not be optimal.", arch)
-            architectures[i] = "TransformersForCausalLM"
+            architectures[i] = "TransformersModel"
     return architectures
 
 
@@ -101,7 +103,8 @@ def get_model_architecture(
                             for arch in architectures)
     if (not is_vllm_supported
             or model_config.model_impl == ModelImpl.TRANSFORMERS):
-        architectures = resolve_transformers_arch(model_config, architectures)
+        architectures = resolve_transformers_fallback(model_config,
+                                                      architectures)
 
     model_cls, arch = ModelRegistry.resolve_model_cls(architectures)
     if model_config.task == "embed":

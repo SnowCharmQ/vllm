@@ -3,8 +3,8 @@ import pytest
 
 from vllm.config import CacheConfig, ModelConfig, SchedulerConfig, VllmConfig
 from vllm.sampling_params import SamplingParams
-from vllm.v1.core.sched.output import (CachedRequestData, NewRequestData,
-                                       SchedulerOutput)
+from vllm.v1.core.scheduler_output import (CachedRequestData, NewRequestData,
+                                           SchedulerOutput)
 from vllm.v1.sample.metadata import SamplingMetadata
 from vllm.v1.worker.gpu_model_runner import GPUModelRunner
 
@@ -72,8 +72,6 @@ def _schedule_new_request(*req_ids: str) -> SchedulerOutput:
         num_common_prefix_blocks=0,
         finished_req_ids=set(),
         free_encoder_input_ids=[],
-        structured_output_request_ids={},
-        grammar_bitmask=None,
     )
 
 
@@ -91,17 +89,6 @@ def _is_sampling_metadata_changed(model_runner,
         sampling_metadata_before)
 
 
-def _is_req_state_block_table_match(model_runner, req_id: str) -> bool:
-    req_index = model_runner.input_batch.req_id_to_index[req_id]
-    block_table = model_runner.input_batch.block_table
-    req_state = model_runner.requests[req_id]
-    if block_table.num_blocks_per_row[req_index] != len(req_state.block_ids):
-        return False
-    num_blocks = block_table.num_blocks_per_row[req_index]
-    return (block_table.block_table_np[req_index, :num_blocks] ==
-            req_state.block_ids).all()
-
-
 def test_update_states_new_request(model_runner):
     req_id = "req_0"
 
@@ -113,7 +100,6 @@ def test_update_states_new_request(model_runner):
     assert _is_sampling_metadata_changed(model_runner, metadata_before)
     assert _is_req_added(model_runner, req_id)
     assert _is_req_scheduled(model_runner, req_id)
-    assert _is_req_state_block_table_match(model_runner, req_id)
 
 
 def test_update_states_request_finished(model_runner):
@@ -137,8 +123,6 @@ def test_update_states_request_finished(model_runner):
         num_common_prefix_blocks=0,
         finished_req_ids={req_id},
         free_encoder_input_ids=[],
-        structured_output_request_ids={},
-        grammar_bitmask=None,
     )
 
     metadata_before = model_runner.input_batch.sampling_metadata
@@ -169,8 +153,6 @@ def test_update_states_request_resumed(model_runner):
         num_common_prefix_blocks=0,
         finished_req_ids=set(),
         free_encoder_input_ids=[],
-        structured_output_request_ids={},
-        grammar_bitmask=None,
     )
 
     model_runner._update_states(scheduler_output)
@@ -196,8 +178,6 @@ def test_update_states_request_resumed(model_runner):
         num_common_prefix_blocks=0,
         finished_req_ids=set(),
         free_encoder_input_ids=[],
-        structured_output_request_ids={},
-        grammar_bitmask=None,
     )
 
     metadata_before = model_runner.input_batch.sampling_metadata
@@ -205,7 +185,6 @@ def test_update_states_request_resumed(model_runner):
     assert _is_sampling_metadata_changed(model_runner, metadata_before)
     assert _is_req_added(model_runner, req_id)
     assert _is_req_scheduled(model_runner, req_id)
-    assert _is_req_state_block_table_match(model_runner, req_id)
 
 
 def test_update_states_no_changes(model_runner):
@@ -229,8 +208,6 @@ def test_update_states_no_changes(model_runner):
         num_common_prefix_blocks=0,
         finished_req_ids=set(),
         free_encoder_input_ids=[],
-        structured_output_request_ids={},
-        grammar_bitmask=None,
     )
 
     metadata_before = model_runner.input_batch.sampling_metadata
@@ -238,7 +215,6 @@ def test_update_states_no_changes(model_runner):
     assert not _is_sampling_metadata_changed(model_runner, metadata_before)
     assert _is_req_added(model_runner, req_id)
     assert _is_req_scheduled(model_runner, req_id)
-    assert _is_req_state_block_table_match(model_runner, req_id)
 
 
 def test_update_states_request_unscheduled(model_runner):
@@ -266,8 +242,6 @@ def test_update_states_request_unscheduled(model_runner):
         num_common_prefix_blocks=0,
         finished_req_ids=set(),
         free_encoder_input_ids=[],
-        structured_output_request_ids={},
-        grammar_bitmask=None,
     )
 
     metadata_before = model_runner._update_states(scheduler_output)
