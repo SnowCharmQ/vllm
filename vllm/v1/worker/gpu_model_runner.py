@@ -204,8 +204,8 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                                      dtype=torch.int32,
                                      device=self.device)
         self.his_emb = torch.zeros((self.max_num_tokens, 64, 1536),
-                            dtype=torch.bfloat16,
-                            device=self.device)
+                                   dtype=torch.bfloat16,
+                                   device=self.device)
         self.positions = torch.zeros(self.max_num_tokens,
                                      dtype=torch.int64,
                                      device=self.device)
@@ -499,7 +499,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             max_num_scheduled_tokens = max(max_num_scheduled_tokens,
                                            num_tokens)
             req_his_embs[i] = self.requests[req_id].his_emb
-            
+
         # Get request indices.
         # E.g., [2, 5, 3] -> [0, 0, 1, 1, 1, 1, 1, 2, 2, 2]
         req_indices = np.repeat(self.arange_np[:num_reqs],
@@ -542,10 +542,12 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                            0,
                            torch.from_numpy(token_indices),
                            out=self.input_ids_cpu[:total_num_scheduled_tokens])
-        
+
         his_emb_indices_tensor = torch.tensor(req_indices, dtype=torch.long)
-        expanded_his_emb_indices_tensor = torch.index_select(req_his_embs, dim=0, index=his_emb_indices_tensor)
-        self.his_emb[:total_num_scheduled_tokens] = expanded_his_emb_indices_tensor
+        expanded_his_emb_indices_tensor = torch.index_select(
+            req_his_embs, dim=0, index=his_emb_indices_tensor)
+        self.his_emb[:
+                     total_num_scheduled_tokens] = expanded_his_emb_indices_tensor
 
         # Calculate the slot mapping.
         # E.g., [0, 1, 0, 1, 2, 3, 4, 0, 1, 2]
