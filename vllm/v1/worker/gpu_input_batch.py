@@ -225,7 +225,7 @@ class InputBatch:
         # This is updated each time the batch constituents change.
         self.sampling_metadata = self._make_sampling_metadata()
 
-        self.his_emb = torch.empty((max_num_reqs, 1536),
+        self.his_emb = torch.empty((max_num_reqs, 64, 1536),
                                    dtype=torch.bfloat16,
                                    device=device)
 
