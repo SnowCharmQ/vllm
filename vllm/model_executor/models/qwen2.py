@@ -496,6 +496,46 @@ class Qwen2ForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
         return loader.load_weights(weights)
 
 
+class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
+
+    def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
+        super().__init__(vllm_config=vllm_config, prefix=prefix)
+        self.vllm_config = vllm_config
+        mult_k = 4
+        self.emb_hidden_size = 1536
+        self.align_mlp_inst = nn.Sequential(
+            nn.Linear(self.emb_hidden_size, self.config.hidden_size * mult_k),
+            nn.GELU(),
+            nn.Linear(self.config.hidden_size * mult_k,
+                      self.config.hidden_size))
+        self.inst_token = nn.Parameter(torch.rand(1, self.emb_hidden_size),
+                                       requires_grad=True)
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        positions: torch.Tensor,
+        intermediate_tensors: Optional[IntermediateTensors] = None,
+        inputs_embeds: Optional[torch.Tensor] = None,
+    ) -> Union[torch.Tensor, IntermediateTensors]:
+        inputs_embeds = self.get_input_embeddings(input_ids)
+        inst_emb = self.align_mlp_inst(self.inst_token)
+        for i in range(len(input_ids)):
+            if input_ids[i] == 151665: inputs_embeds[i] = inst_emb
+        hidden_states = self.model(input_ids, positions, intermediate_tensors,
+                                   inputs_embeds)
+        return hidden_states
+    
+    def load_weights(self, weights: Iterable[Tuple[str,
+                                                   torch.Tensor]]) -> Set[str]:
+        loader = AutoWeightsLoader(
+            self,
+            skip_prefixes=(["lm_head."]
+                           if self.config.tie_word_embeddings else None),
+        )
+        return loader.load_weights(weights)
+
+
 class Qwen2EmbeddingModel(nn.Module, SupportsLoRA, SupportsPP):
     packed_modules_mapping = {
         "qkv_proj": [
