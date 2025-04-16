@@ -504,7 +504,7 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         self.vllm_config = vllm_config
         mult_k = 4
         self.emb_hidden_size = 1536
-        self.align_mlp = nn.Sequential(
+        self.align_mlp_his = nn.Sequential(
             nn.Linear(self.emb_hidden_size, self.config.hidden_size * mult_k),
             nn.GELU(),
             nn.Linear(self.config.hidden_size * mult_k,
@@ -529,7 +529,7 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         if his_emb is not None:
             his_emb = his_emb / (his_emb.norm(dim=-1, keepdim=True) + 1e-6)
             his_emb = his_emb.unsqueeze(0)
-            profile_emb = self.align_mlp(his_emb)
+            profile_emb = self.align_mlp_his(his_emb)
             profile_emb = profile_emb.squeeze(0)
             inst_emb = self.align_mlp_inst(self.inst_token)
             for i in range(len(input_ids)):
@@ -538,8 +538,7 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
                 elif input_ids[i] in NEW_TOKEN_IDS[:-1]:
                     token_idx = NEW_TOKEN_IDS.index(input_ids[i])
                     inputs_embeds[i] = profile_emb[i][token_idx]
-        hidden_states = self.model(input_ids, positions, intermediate_tensors,
-                                   inputs_embeds)
+        hidden_states = self.model(input_ids, positions, intermediate_tensors, inputs_embeds)
         return hidden_states
 
 
