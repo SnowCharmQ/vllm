@@ -538,7 +538,8 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
                 elif input_ids[i] in NEW_TOKEN_IDS[:-1]:
                     token_idx = NEW_TOKEN_IDS.index(input_ids[i])
                     inputs_embeds[i] = profile_emb[i][token_idx]
-        hidden_states = self.model(input_ids, positions, intermediate_tensors, inputs_embeds)
+        hidden_states = self.model(input_ids, positions, intermediate_tensors,
+                                   inputs_embeds)
         return hidden_states
 
 
