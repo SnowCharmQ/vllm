@@ -205,3 +205,5 @@ actionlint
 shellcheck*/
 
 checkpoint*/
+demo/
+demo.py
