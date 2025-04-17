@@ -14,7 +14,7 @@ __all__ = [
     "PackedvLLMParameter",
 ]
 
-NEW_TOKENS = [f"[HIS_TOKEN_{i}]" for i in range(8)] + ["[INST_TOKEN]"]
+NEW_TOKENS = [f"[REVIEW_TOKEN_{i}]" for i in range(8)]
 NEW_TOKEN_IDS = [
     151665,
     151666,
@@ -24,5 +24,4 @@ NEW_TOKEN_IDS = [
     151670,
     151671,
     151672,
-    151673,
 ]

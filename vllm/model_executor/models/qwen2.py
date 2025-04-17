@@ -509,13 +509,6 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
             nn.GELU(),
             nn.Linear(self.config.hidden_size * mult_k,
                       self.config.hidden_size))
-        self.align_mlp_inst = nn.Sequential(
-            nn.Linear(self.emb_hidden_size, self.config.hidden_size * mult_k),
-            nn.GELU(),
-            nn.Linear(self.config.hidden_size * mult_k,
-                      self.config.hidden_size))
-        self.inst_token = nn.Parameter(torch.rand(1, self.emb_hidden_size),
-                                       requires_grad=True)
 
     def forward(
         self,
@@ -531,11 +524,8 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
             his_emb = his_emb.unsqueeze(0)
             profile_emb = self.align_mlp_his(his_emb)
             profile_emb = profile_emb.squeeze(0)
-            inst_emb = self.align_mlp_inst(self.inst_token)
             for i in range(len(input_ids)):
-                if input_ids[i] == NEW_TOKEN_IDS[-1]:
-                    inputs_embeds[i] = inst_emb
-                elif input_ids[i] in NEW_TOKEN_IDS[:-1]:
+                if input_ids[i] in NEW_TOKEN_IDS:
                     token_idx = NEW_TOKEN_IDS.index(input_ids[i])
                     inputs_embeds[i] = profile_emb[i][token_idx]
         hidden_states = self.model(input_ids, positions, intermediate_tensors,
