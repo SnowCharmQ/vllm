@@ -516,13 +516,13 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         positions: torch.Tensor,
         intermediate_tensors: Optional[IntermediateTensors] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
-        his_emb: Optional[torch.Tensor] = None,
+        item_emb: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
         inputs_embeds = self.get_input_embeddings(input_ids)
-        if his_emb is not None:
-            his_emb = his_emb / (his_emb.norm(dim=-1, keepdim=True) + 1e-6)
-            his_emb = his_emb.unsqueeze(0)
-            profile_emb = self.align_mlp_his(his_emb)
+        if item_emb is not None:
+            item_emb = item_emb / (item_emb.norm(dim=-1, keepdim=True) + 1e-6)
+            item_emb = item_emb.unsqueeze(0)
+            profile_emb = self.align_mlp_his(item_emb)
             profile_emb = profile_emb.squeeze(0)
             for i in range(len(input_ids)):
                 if input_ids[i] in NEW_TOKEN_IDS:

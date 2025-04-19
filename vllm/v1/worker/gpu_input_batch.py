@@ -34,7 +34,7 @@ class CachedRequestState:
     num_computed_tokens: int
     output_token_ids: list[int]
 
-    his_emb: Optional[torch.Tensor]
+    item_emb: Optional[torch.Tensor]
 
     mrope_positions: Optional[torch.Tensor] = None
     mrope_position_delta: Optional[int] = None
@@ -225,7 +225,7 @@ class InputBatch:
         # This is updated each time the batch constituents change.
         self.sampling_metadata = self._make_sampling_metadata()
 
-        self.his_emb = torch.empty((max_num_reqs, 8, 1536),
+        self.item_emb = torch.empty((max_num_reqs, 8, 1536),
                                    dtype=torch.bfloat16,
                                    device=device)
 
@@ -357,7 +357,7 @@ class InputBatch:
             # No LoRA
             self.request_lora_mapping[req_index] = 0
 
-        self.his_emb[req_index] = request.his_emb
+        self.item_emb[req_index] = request.item_emb
 
     def remove_request(self, req_id: str) -> Optional[int]:
         """This method must always be followed by a call to condense()."""
@@ -431,8 +431,8 @@ class InputBatch:
             self.repetition_penalties_cpu[i2], self.repetition_penalties_cpu[i1]
         self.min_p_cpu[i1], self.min_p_cpu[i2] =\
             self.min_p_cpu[i2], self.min_p_cpu[i1]
-        self.his_emb[i1], self.his_emb[i2] =\
-            self.his_emb[i2], self.his_emb[i1]
+        self.item_emb[i1], self.item_emb[i2] =\
+            self.item_emb[i2], self.item_emb[i1]
 
         # NOTE: the following is unsafe
         # self.token_ids_cpu[i1, ...], self.token_ids_cpu[i2, ...], =\

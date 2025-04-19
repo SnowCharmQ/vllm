@@ -180,7 +180,7 @@ class AsyncLLM(EngineClient):
         request_id: str,
         prompt: PromptType,
         params: Union[SamplingParams, PoolingParams],
-        his_emb: Optional[torch.Tensor],
+        item_emb: Optional[torch.Tensor],
         arrival_time: Optional[float] = None,
         lora_request: Optional[LoRARequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
@@ -197,7 +197,7 @@ class AsyncLLM(EngineClient):
 
         # Convert Input --> Request.
         request = self.processor.process_inputs(request_id, prompt, params,
-                                                his_emb, arrival_time,
+                                                item_emb, arrival_time,
                                                 lora_request, trace_headers,
                                                 prompt_adapter_request,
                                                 priority)
@@ -238,7 +238,7 @@ class AsyncLLM(EngineClient):
         self,
         prompt: PromptType,
         sampling_params: SamplingParams,
-        his_emb: Optional[torch.Tensor],
+        item_emb: Optional[torch.Tensor],
         request_id: str,
         lora_request: Optional[LoRARequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
@@ -272,7 +272,7 @@ class AsyncLLM(EngineClient):
                 request_id,
                 prompt,
                 sampling_params,
-                his_emb,
+                item_emb,
                 lora_request=lora_request,
                 trace_headers=trace_headers,
                 prompt_adapter_request=prompt_adapter_request,

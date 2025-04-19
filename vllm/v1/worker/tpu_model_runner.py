@@ -277,7 +277,7 @@ class TPUModelRunner:
                 req_id=req_id,
                 prompt_token_ids=new_req_data.prompt_token_ids,
                 prompt=new_req_data.prompt,
-                his_emb=new_req_data.his_emb,
+                item_emb=new_req_data.item_emb,
                 mm_inputs=new_req_data.mm_inputs,
                 mm_positions=new_req_data.mm_positions,
                 sampling_params=sampling_params,

@@ -381,7 +381,7 @@ class LLM:
         self,
         prompts: Union[Union[PromptType, Sequence[PromptType]],
                        Optional[Union[str, list[str]]]] = None,
-        his_embs: Optional[Union[torch.Tensor, 
+        item_embs: Optional[Union[torch.Tensor, 
                                  Sequence[torch.Tensor]]] = None,
         sampling_params: Optional[Union[SamplingParams,
                                         Sequence[SamplingParams]]] = None,
@@ -464,7 +464,7 @@ class LLM:
 
         self._validate_and_add_requests(
             prompts=parsed_prompts,
-            his_embs=his_embs,
+            item_embs=item_embs,
             params=sampling_params,
             lora_request=lora_request,
             prompt_adapter_request=prompt_adapter_request,
@@ -1296,7 +1296,7 @@ class LLM:
     def _validate_and_add_requests(
         self,
         prompts: Union[PromptType, Sequence[PromptType]],
-        his_embs: Optional[Union[torch.Tensor, 
+        item_embs: Optional[Union[torch.Tensor, 
                                  Sequence[torch.Tensor]]],
         params: Union[SamplingParams, Sequence[SamplingParams], PoolingParams,
                       Sequence[PoolingParams]],
@@ -1338,7 +1338,7 @@ class LLM:
             self._add_request(
                 prompts[i],
                 params[i] if isinstance(params, Sequence) else params,
-                his_embs[i],
+                item_embs[i],
                 lora_request=lora_request[i] if isinstance(
                     lora_request, Sequence) else lora_request,
                 prompt_adapter_request=prompt_adapter_request,
@@ -1349,7 +1349,7 @@ class LLM:
         self,
         prompt: PromptType,
         params: Union[SamplingParams, PoolingParams],
-        his_emb: Optional[torch.Tensor],
+        item_emb: Optional[torch.Tensor],
         lora_request: Optional[LoRARequest] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
         priority: int = 0,
@@ -1359,7 +1359,7 @@ class LLM:
             request_id,
             prompt,
             params,
-            his_emb,
+            item_emb,
             lora_request=lora_request,
             prompt_adapter_request=prompt_adapter_request,
             priority=priority,
