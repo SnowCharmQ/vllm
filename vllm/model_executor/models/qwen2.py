@@ -502,7 +502,7 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
         super().__init__(vllm_config=vllm_config, prefix=prefix)
         self.vllm_config = vllm_config
-        mult_k = 4
+        mult_k = 1
         self.emb_hidden_size = 1536
         self.align_mlp = nn.Sequential(
             nn.Linear(self.emb_hidden_size, self.config.hidden_size * mult_k),
