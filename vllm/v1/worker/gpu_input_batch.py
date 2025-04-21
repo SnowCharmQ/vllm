@@ -226,8 +226,8 @@ class InputBatch:
         self.sampling_metadata = self._make_sampling_metadata()
 
         self.his_item_emb = torch.empty((max_num_reqs, 17, 1536),
-                                   dtype=torch.bfloat16,
-                                   device=device)
+                                        dtype=torch.bfloat16,
+                                        device=device)
 
     @property
     def req_ids(self) -> list[str]:

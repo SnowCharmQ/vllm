@@ -204,8 +204,8 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                                      dtype=torch.int32,
                                      device=self.device)
         self.his_item_emb = torch.zeros((self.max_num_tokens, 17, 1536),
-                                   dtype=torch.bfloat16,
-                                   device=self.device)
+                                        dtype=torch.bfloat16,
+                                        device=self.device)
         self.positions = torch.zeros(self.max_num_tokens,
                                      dtype=torch.int64,
                                      device=self.device)
@@ -491,7 +491,8 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         # Get the number of scheduled tokens for each request.
         # TODO: The Python loop can be slow. Optimize.
         num_scheduled_tokens = np.empty(num_reqs, dtype=np.int32)
-        req_his_item_embs = torch.zeros((num_reqs, 17, 1536), dtype=torch.bfloat16)
+        req_his_item_embs = torch.zeros((num_reqs, 17, 1536),
+                                        dtype=torch.bfloat16)
         max_num_scheduled_tokens = 0
         for i, req_id in enumerate(self.input_batch.req_ids):
             num_tokens = scheduler_output.num_scheduled_tokens[req_id]
@@ -543,11 +544,12 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                            torch.from_numpy(token_indices),
                            out=self.input_ids_cpu[:total_num_scheduled_tokens])
 
-        his_item_emb_indices_tensor = torch.tensor(req_indices, dtype=torch.long)
+        his_item_emb_indices_tensor = torch.tensor(req_indices,
+                                                   dtype=torch.long)
         expanded_his_item_emb_indices_tensor = torch.index_select(
             req_his_item_embs, dim=0, index=his_item_emb_indices_tensor)
         self.his_item_emb[:
-                     total_num_scheduled_tokens] = expanded_his_item_emb_indices_tensor
+                          total_num_scheduled_tokens] = expanded_his_item_emb_indices_tensor
 
         # Calculate the slot mapping.
         # E.g., [0, 1, 0, 1, 2, 3, 4, 0, 1, 2]

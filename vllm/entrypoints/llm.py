@@ -6,8 +6,8 @@ from collections.abc import Sequence
 from contextlib import contextmanager
 from typing import Any, Callable, ClassVar, Optional, Union, cast, overload
 
-import torch
 import cloudpickle
+import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
 from typing_extensions import TypeVar, deprecated
@@ -381,8 +381,8 @@ class LLM:
         self,
         prompts: Union[Union[PromptType, Sequence[PromptType]],
                        Optional[Union[str, list[str]]]] = None,
-        his_item_embs: Optional[Union[torch.Tensor, 
-                                 Sequence[torch.Tensor]]] = None,
+        his_item_embs: Optional[Union[torch.Tensor,
+                                      Sequence[torch.Tensor]]] = None,
         sampling_params: Optional[Union[SamplingParams,
                                         Sequence[SamplingParams]]] = None,
         prompt_token_ids: Optional[Union[list[int], list[list[int]]]] = None,
@@ -1296,8 +1296,7 @@ class LLM:
     def _validate_and_add_requests(
         self,
         prompts: Union[PromptType, Sequence[PromptType]],
-        his_item_embs: Optional[Union[torch.Tensor, 
-                                 Sequence[torch.Tensor]]],
+        his_item_embs: Optional[Union[torch.Tensor, Sequence[torch.Tensor]]],
         params: Union[SamplingParams, Sequence[SamplingParams], PoolingParams,
                       Sequence[PoolingParams]],
         lora_request: Optional[Union[Sequence[LoRARequest], LoRARequest]],

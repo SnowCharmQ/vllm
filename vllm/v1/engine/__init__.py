@@ -5,8 +5,8 @@ import time
 from collections.abc import Sequence
 from typing import Any, Optional, Union
 
-import torch
 import msgspec
+import torch
 
 from vllm.lora.request import LoRARequest
 from vllm.multimodal import MultiModalKwargs

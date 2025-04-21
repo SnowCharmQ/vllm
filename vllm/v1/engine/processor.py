@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import time
-import torch
 from collections.abc import Mapping, Sequence
 from typing import Literal, Optional, Union
+
+import torch
 
 from vllm.config import VllmConfig
 from vllm.inputs import ProcessorInputs, PromptType, SingletonInputs

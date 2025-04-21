@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import enum
-import torch
-
 from typing import TYPE_CHECKING, Optional, Union
+
+import torch
 
 from vllm.multimodal.inputs import MultiModalKwargs, PlaceholderRange
 from vllm.sampling_params import SamplingParams

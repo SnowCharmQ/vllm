@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
-import torch
-
 from collections.abc import Mapping
 from copy import copy
 from typing import Any, Callable, Optional, Union
 
+import torch
 from typing_extensions import TypeVar
 
 import vllm.envs as envs

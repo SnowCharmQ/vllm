@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import torch
-
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
+
+import torch
 
 if TYPE_CHECKING:
     import numpy as np

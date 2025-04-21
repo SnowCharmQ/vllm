@@ -520,7 +520,8 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
     ) -> Union[torch.Tensor, IntermediateTensors]:
         inputs_embeds = self.get_input_embeddings(input_ids)
         if his_item_emb is not None:
-            his_item_emb = his_item_emb / (his_item_emb.norm(dim=-1, keepdim=True) + 1e-6)
+            his_item_emb = his_item_emb / (
+                his_item_emb.norm(dim=-1, keepdim=True) + 1e-6)
             his_item_emb = his_item_emb.unsqueeze(0)
             profile_emb = self.align_mlp_his_item(his_item_emb)
             profile_emb = profile_emb.squeeze(0)

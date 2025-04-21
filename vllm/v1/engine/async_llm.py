@@ -7,8 +7,8 @@ from collections.abc import AsyncGenerator, Mapping
 from copy import copy
 from typing import Optional, Union
 
-import torch
 import numpy as np
+import torch
 
 import vllm.envs as envs
 from vllm.config import ModelConfig, VllmConfig
