@@ -203,7 +203,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         self.input_ids = torch.zeros(self.max_num_tokens,
                                      dtype=torch.int32,
                                      device=self.device)
-        self.his_emb = torch.zeros((self.max_num_tokens, 8, 1536),
+        self.his_emb = torch.zeros((self.max_num_tokens, 64, 1536),
                                    dtype=torch.bfloat16,
                                    device=self.device)
         self.positions = torch.zeros(self.max_num_tokens,
