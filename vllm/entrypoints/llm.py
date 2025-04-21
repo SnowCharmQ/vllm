@@ -381,7 +381,7 @@ class LLM:
         self,
         prompts: Union[Union[PromptType, Sequence[PromptType]],
                        Optional[Union[str, list[str]]]] = None,
-        item_embs: Optional[Union[torch.Tensor, 
+        his_item_embs: Optional[Union[torch.Tensor, 
                                  Sequence[torch.Tensor]]] = None,
         sampling_params: Optional[Union[SamplingParams,
                                         Sequence[SamplingParams]]] = None,
@@ -464,7 +464,7 @@ class LLM:
 
         self._validate_and_add_requests(
             prompts=parsed_prompts,
-            item_embs=item_embs,
+            his_item_embs=his_item_embs,
             params=sampling_params,
             lora_request=lora_request,
             prompt_adapter_request=prompt_adapter_request,
@@ -1296,7 +1296,7 @@ class LLM:
     def _validate_and_add_requests(
         self,
         prompts: Union[PromptType, Sequence[PromptType]],
-        item_embs: Optional[Union[torch.Tensor, 
+        his_item_embs: Optional[Union[torch.Tensor, 
                                  Sequence[torch.Tensor]]],
         params: Union[SamplingParams, Sequence[SamplingParams], PoolingParams,
                       Sequence[PoolingParams]],
@@ -1338,7 +1338,7 @@ class LLM:
             self._add_request(
                 prompts[i],
                 params[i] if isinstance(params, Sequence) else params,
-                item_embs[i],
+                his_item_embs[i],
                 lora_request=lora_request[i] if isinstance(
                     lora_request, Sequence) else lora_request,
                 prompt_adapter_request=prompt_adapter_request,
@@ -1349,7 +1349,7 @@ class LLM:
         self,
         prompt: PromptType,
         params: Union[SamplingParams, PoolingParams],
-        item_emb: Optional[torch.Tensor],
+        his_item_emb: Optional[torch.Tensor],
         lora_request: Optional[LoRARequest] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
         priority: int = 0,
@@ -1359,7 +1359,7 @@ class LLM:
             request_id,
             prompt,
             params,
-            item_emb,
+            his_item_emb,
             lora_request=lora_request,
             prompt_adapter_request=prompt_adapter_request,
             priority=priority,

@@ -24,7 +24,7 @@ class Request:
         request_id: str,
         prompt: Optional[str],
         prompt_token_ids: list[int],
-        item_emb: Optional[torch.Tensor],
+        his_item_emb: Optional[torch.Tensor],
         multi_modal_inputs: Optional[list[MultiModalKwargs]],
         multi_modal_hashes: Optional[list[str]],
         multi_modal_placeholders: Optional[list[PlaceholderRange]],
@@ -51,7 +51,7 @@ class Request:
 
         self.prompt = prompt
         self.prompt_token_ids = prompt_token_ids
-        self.item_emb = item_emb
+        self.his_item_emb = his_item_emb
         self.num_prompt_tokens = len(self.prompt_token_ids)
         self._output_token_ids: list[int] = []
         self._all_token_ids: list[int] = self.prompt_token_ids.copy()
@@ -87,7 +87,7 @@ class Request:
             request_id=request.request_id,
             prompt=request.prompt,
             prompt_token_ids=request.prompt_token_ids,
-            item_emb=request.item_emb,
+            his_item_emb=request.his_item_emb,
             multi_modal_inputs=request.mm_inputs,
             multi_modal_hashes=request.mm_hashes,
             multi_modal_placeholders=request.mm_placeholders,

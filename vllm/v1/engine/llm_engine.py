@@ -178,7 +178,7 @@ class LLMEngine:
         request_id: str,
         prompt: PromptType,
         params: Union[SamplingParams, PoolingParams],
-        item_emb: Optional[torch.Tensor],
+        his_item_emb: Optional[torch.Tensor],
         arrival_time: Optional[float] = None,
         lora_request: Optional[LoRARequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
@@ -187,7 +187,7 @@ class LLMEngine:
     ) -> None:
         # Process raw inputs into the request.
         request = self.processor.process_inputs(request_id, prompt, params,
-                                                item_emb, arrival_time,
+                                                his_item_emb, arrival_time,
                                                 lora_request, trace_headers,
                                                 prompt_adapter_request,
                                                 priority)
