@@ -504,11 +504,6 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         self.vllm_config = vllm_config
         mult_k = 4
         self.emb_hidden_size = 1536
-        self.align_mlp_his = nn.Sequential(
-            nn.Linear(self.emb_hidden_size, self.config.hidden_size * mult_k),
-            nn.GELU(),
-            nn.Linear(self.config.hidden_size * mult_k,
-                      self.config.hidden_size))
         self.align_mlp_item = nn.Sequential(
             nn.Linear(self.emb_hidden_size, self.config.hidden_size * mult_k),
             nn.GELU(),
