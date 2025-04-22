@@ -203,7 +203,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         self.input_ids = torch.zeros(self.max_num_tokens,
                                      dtype=torch.int32,
                                      device=self.device)
-        self.his_item_emb = torch.zeros((self.max_num_tokens, 17, 1536),
+        self.his_item_emb = torch.zeros((self.max_num_tokens, 16, 1536),
                                         dtype=torch.bfloat16,
                                         device=self.device)
         self.positions = torch.zeros(self.max_num_tokens,
@@ -491,7 +491,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         # Get the number of scheduled tokens for each request.
         # TODO: The Python loop can be slow. Optimize.
         num_scheduled_tokens = np.empty(num_reqs, dtype=np.int32)
-        req_his_item_embs = torch.zeros((num_reqs, 17, 1536),
+        req_his_item_embs = torch.zeros((num_reqs, 16, 1536),
                                         dtype=torch.bfloat16)
         max_num_scheduled_tokens = 0
         for i, req_id in enumerate(self.input_batch.req_ids):

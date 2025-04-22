@@ -504,7 +504,7 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         self.vllm_config = vllm_config
         mult_k = 4
         self.emb_hidden_size = 1536
-        self.align_mlp_his_item = nn.Sequential(
+        self.align_mlp_his = nn.Sequential(
             nn.Linear(self.emb_hidden_size, self.config.hidden_size * mult_k),
             nn.GELU(),
             nn.Linear(self.config.hidden_size * mult_k,
@@ -523,7 +523,7 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
             his_item_emb = his_item_emb / (
                 his_item_emb.norm(dim=-1, keepdim=True) + 1e-6)
             his_item_emb = his_item_emb.unsqueeze(0)
-            profile_emb = self.align_mlp_his_item(his_item_emb)
+            profile_emb = self.align_mlp_his(his_item_emb)
             profile_emb = profile_emb.squeeze(0)
             for i in range(len(input_ids)):
                 if input_ids[i] in NEW_TOKEN_IDS:
