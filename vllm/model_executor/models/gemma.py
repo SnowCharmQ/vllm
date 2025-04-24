@@ -22,6 +22,7 @@ import torch
 from torch import nn
 from transformers import GemmaConfig
 
+from vllm.model_executor import NEW_TOKEN_IDS
 from vllm.attention import Attention
 from vllm.compilation.decorators import support_torch_compile
 from vllm.config import CacheConfig, VllmConfig
@@ -431,3 +432,40 @@ class GemmaForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
                            if self.config.tie_word_embeddings else None),
         )
         return loader.load_weights(weights)
+
+
+class GemmaForCausalPersonalLM(GemmaForCausalLM):
+
+    def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
+        super().__init__(vllm_config=vllm_config, prefix=prefix)
+        self.vllm_config = vllm_config
+        mult_k = 4
+        self.emb_hidden_size = 1536
+        self.align_mlp_his = nn.Sequential(
+            nn.Linear(self.emb_hidden_size, self.config.hidden_size * mult_k),
+            nn.GELU(),
+            nn.Linear(self.config.hidden_size * mult_k,
+                      self.config.hidden_size))
+        
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        positions: torch.Tensor,
+        intermediate_tensors: Optional[IntermediateTensors] = None,
+        inputs_embeds: Optional[torch.Tensor] = None,
+        his_item_emb: Optional[torch.Tensor] = None,
+    ) -> Union[torch.Tensor, IntermediateTensors]:
+        inputs_embeds = self.get_input_embeddings(input_ids)
+        if his_item_emb is not None:
+            his_item_emb = his_item_emb / (
+                his_item_emb.norm(dim=-1, keepdim=True) + 1e-6)
+            his_item_emb = his_item_emb.unsqueeze(0)
+            profile_emb = self.align_mlp_his(his_item_emb)
+            profile_emb = profile_emb.squeeze(0)
+            for i in range(len(input_ids)):
+                if input_ids[i] in NEW_TOKEN_IDS:
+                    token_idx = NEW_TOKEN_IDS.index(input_ids[i])
+                    inputs_embeds[i] = profile_emb[i][token_idx]
+        hidden_states = self.model(input_ids, positions, intermediate_tensors,
+                                   inputs_embeds)
+        return hidden_states
