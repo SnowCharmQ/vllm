@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from typing import Any, Callable, ClassVar, Optional, Union, cast, overload
 
 import cloudpickle
+import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
 from typing_extensions import TypeVar, deprecated
@@ -383,6 +384,8 @@ class LLM:
                        Optional[Union[str, list[str]]]] = None,
         sampling_params: Optional[Union[SamplingParams,
                                         Sequence[SamplingParams]]] = None,
+        his_embs: Optional[Union[list[torch.Tensor], torch.Tensor]] = None,
+        task_embs: Optional[Union[list[torch.Tensor], torch.Tensor]] = None,
         prompt_token_ids: Optional[Union[list[int], list[list[int]]]] = None,
         use_tqdm: bool = True,
         lora_request: Optional[Union[list[LoRARequest], LoRARequest]] = None,
@@ -464,6 +467,8 @@ class LLM:
         self._validate_and_add_requests(
             prompts=parsed_prompts,
             params=sampling_params,
+            his_embs=his_embs,
+            task_embs=task_embs,
             use_tqdm=use_tqdm,
             lora_request=lora_request,
             prompt_adapter_request=prompt_adapter_request,
@@ -1342,6 +1347,8 @@ class LLM:
         prompts: Union[PromptType, Sequence[PromptType]],
         params: Union[SamplingParams, Sequence[SamplingParams], PoolingParams,
                       Sequence[PoolingParams]],
+        his_embs: Optional[Union[list[torch.Tensor], torch.Tensor]] = None,
+        task_embs: Optional[Union[list[torch.Tensor], torch.Tensor]] = None,
         *,
         use_tqdm: bool,
         lora_request: Optional[Union[Sequence[LoRARequest], LoRARequest]],
@@ -1387,6 +1394,8 @@ class LLM:
             self._add_request(
                 prompt,
                 params[i] if isinstance(params, Sequence) else params,
+                his_emb=his_embs[i] if isinstance(his_embs, Sequence) else his_embs,
+                task_emb=task_embs[i] if isinstance(task_embs, Sequence) else task_embs,
                 tokenization_kwargs=tokenization_kwargs,
                 lora_request=lora_request[i] if isinstance(
                     lora_request, Sequence) else lora_request,
@@ -1398,6 +1407,8 @@ class LLM:
         self,
         prompt: PromptType,
         params: Union[SamplingParams, PoolingParams],
+        his_emb: Optional[torch.Tensor] = None,
+        task_emb: Optional[torch.Tensor] = None,
         tokenization_kwargs: Optional[dict[str, Any]] = None,
         lora_request: Optional[LoRARequest] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
@@ -1408,6 +1419,8 @@ class LLM:
             request_id,
             prompt,
             params,
+            his_emb=his_emb,
+            task_emb=task_emb,
             lora_request=lora_request,
             tokenization_kwargs=tokenization_kwargs,
             prompt_adapter_request=prompt_adapter_request,

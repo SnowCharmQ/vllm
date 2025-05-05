@@ -485,6 +485,53 @@ class Qwen2ForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
         )
         return loader.load_weights(weights)
 
+class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
+    def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
+        super().__init__(vllm_config=vllm_config, prefix=prefix)
+        self.inst_token_id = 151665
+        self.spc_token_id = 151666
+        self.emb_hidden_size = 1024
+        self.align_mlp_his = nn.Sequential(
+            nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16), 
+            nn.GELU(), 
+            nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
+        )
+        self.align_mlp_inst = nn.Sequential(
+            nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16), 
+            nn.GELU(), 
+            nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
+        )
+        self.inst_token = nn.Parameter(torch.rand((1, self.emb_hidden_size), dtype=torch.bfloat16))
+    
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        positions: torch.Tensor,
+        intermediate_tensors: Optional[IntermediateTensors] = None,
+        inputs_embeds: Optional[torch.Tensor] = None,
+        his_emb: Optional[torch.Tensor] = None,
+        task_emb: Optional[torch.Tensor] = None,
+    ) -> Union[torch.Tensor, IntermediateTensors]:
+        inputs_embeds = self.get_input_embeddings(input_ids)
+        if his_emb is not None and task_emb is not None:
+            print(his_emb.shape, "his_emb.shape")
+            print(task_emb.shape, "task_emb.shape")
+            his_emb = his_emb.to(inputs_embeds.dtype)
+            task_emb = task_emb.to(inputs_embeds.dtype)
+            task_emb = task_emb.squeeze(1)
+            task_emb = task_emb.unsqueeze(-1)
+            his_emb_align = self.align_mlp_his(his_emb)
+            his_weights = torch.bmm(his_emb, task_emb)
+            his_weights = nn.functional.softmax(his_weights, dim=1)
+            profile_emb = torch.bmm(torch.transpose(his_emb_align, 1, 2), his_weights).squeeze(-1)
+            inst_emb = self.align_mlp_inst(self.inst_token)
+            profile_token_idx = input_ids == self.inst_token_id
+            inst_token_idx = input_ids == self.spc_token_id
+            inputs_embeds[profile_token_idx] = profile_emb
+            inputs_embeds[inst_token_idx] = inst_emb
+        hidden_states = self.model(input_ids, positions, intermediate_tensors,
+                                   inputs_embeds)
+        return hidden_states
 
 class Qwen2EmbeddingModel(nn.Module, SupportsLoRA, SupportsPP):
     packed_modules_mapping = {

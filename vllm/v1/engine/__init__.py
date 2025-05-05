@@ -2,6 +2,7 @@
 
 import enum
 import time
+import torch
 from collections.abc import Sequence
 from typing import Any, Optional, Union
 
@@ -50,6 +51,8 @@ class EngineCoreRequest(
 
     request_id: str
     prompt_token_ids: list[int]
+    his_emb: Optional[torch.Tensor]
+    task_emb: Optional[torch.Tensor]
     mm_inputs: Optional[Sequence[Optional[MultiModalKwargs]]]
     mm_hashes: Optional[list[str]]
     mm_placeholders: Optional[list[PlaceholderRange]]

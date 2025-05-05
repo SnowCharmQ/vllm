@@ -215,6 +215,12 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         self.positions = torch.zeros(self.max_num_tokens,
                                      dtype=torch.int64,
                                      device=self.device)
+        self.his_emb = torch.zeros((self.max_num_tokens, 512, 1024),
+                                     dtype=torch.float16,
+                                     device=self.device)
+        self.task_emb = torch.zeros((self.max_num_tokens, 1, 1024),
+                                     dtype=torch.float16,
+                                     device=self.device)
         # None in the first PP rank. The rest are set after load_model.
         self.intermediate_tensors: Optional[IntermediateTensors] = None
 
@@ -347,6 +353,8 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             self.requests[req_id] = CachedRequestState(
                 req_id=req_id,
                 prompt_token_ids=new_req_data.prompt_token_ids,
+                his_emb=new_req_data.his_emb,
+                task_emb=new_req_data.task_emb,
                 mm_inputs=new_req_data.mm_inputs,
                 mm_positions=new_req_data.mm_positions,
                 sampling_params=sampling_params,
@@ -404,6 +412,8 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             # Update the cached states.
             num_computed_tokens = req_data.num_computed_tokens
             req_state.num_computed_tokens = num_computed_tokens
+            req_state.his_emb = req_data.his_emb
+            req_state.task_emb = req_data.task_emb
             # Add the sampled token(s) from the previous step (if any).
             # This doesn't include "unverified" tokens like spec decode tokens.
             num_new_tokens = (num_computed_tokens +
@@ -500,10 +510,19 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         self.input_batch.block_table.commit(num_reqs)
 
         # Get the number of scheduled tokens for each request.
-        req_ids = self.input_batch.req_ids
-        tokens = [scheduler_output.num_scheduled_tokens[i] for i in req_ids]
-        num_scheduled_tokens = np.array(tokens, dtype=np.int32)
-        max_num_scheduled_tokens = max(tokens)
+        num_scheduled_tokens = np.empty(num_reqs, dtype=np.int32)
+        req_his_embs = torch.zeros((num_reqs, 512, 1024),
+                                        dtype=torch.bfloat16)
+        req_task_embs = torch.zeros((num_reqs, 1, 1024),
+                                        dtype=torch.bfloat16)
+        max_num_scheduled_tokens = 0
+        for i, req_id in enumerate(self.input_batch.req_ids):
+            num_tokens = scheduler_output.num_scheduled_tokens[req_id]
+            num_scheduled_tokens[i] = num_tokens
+            max_num_scheduled_tokens = max(max_num_scheduled_tokens,
+                                           num_tokens)
+            req_his_embs[i] = self.requests[req_id].his_emb
+            req_task_embs[i] = self.requests[req_id].task_emb
 
         # Get request indices.
         # E.g., [2, 5, 3] -> [0, 0, 1, 1, 1, 1, 1, 2, 2, 2]
@@ -547,6 +566,28 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                            0,
                            torch.from_numpy(token_indices),
                            out=self.input_ids_cpu[:total_num_scheduled_tokens])
+        
+        his_emb_indices_tensor = torch.tensor(req_indices, dtype=torch.long)
+        expanded_his_emb_indices_tensor = torch.index_select(
+            req_his_embs,
+            dim=0,
+            index=his_emb_indices_tensor
+        )
+        self.his_emb[:total_num_scheduled_tokens].copy_(
+            expanded_his_emb_indices_tensor,
+            non_blocking=True
+        )
+        
+        task_emb_indices_tensor = torch.tensor(req_indices, dtype=torch.long)
+        expanded_task_emb_indices_tensor = torch.index_select(
+            req_task_embs,
+            dim=0,
+            index=task_emb_indices_tensor
+        )
+        self.task_emb[:total_num_scheduled_tokens].copy_(
+            expanded_task_emb_indices_tensor,
+            non_blocking=True
+        )
 
         # Calculate the slot mapping.
         # E.g., [0, 1, 0, 1, 2, 3, 4, 0, 1, 2]
@@ -1078,6 +1119,8 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             # multimodal models, it is not desirable for performance since
             # then the embedding layer is not included in the CUDA graph.
             input_ids = self.input_ids[:num_input_tokens]
+            his_emb = self.his_emb[:num_input_tokens]
+            task_emb = self.task_emb[:num_input_tokens]
             inputs_embeds = None
         if self.uses_mrope:
             positions = self.mrope_positions[:, :num_input_tokens]
@@ -1107,6 +1150,8 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                 positions=positions,
                 intermediate_tensors=intermediate_tensors,
                 inputs_embeds=inputs_embeds,
+                his_emb=his_emb,
+                task_emb=task_emb,
             )
 
         if self.use_aux_hidden_state_outputs:

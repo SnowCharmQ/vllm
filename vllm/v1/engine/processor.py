@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import time
+import torch
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, Optional, Union
 
@@ -196,6 +197,8 @@ class Processor:
         request_id: str,
         prompt: PromptType,
         params: Union[SamplingParams, PoolingParams],
+        his_emb: Optional[torch.Tensor] = None,
+        task_emb: Optional[torch.Tensor] = None,
         arrival_time: Optional[float] = None,
         lora_request: Optional[LoRARequest] = None,
         tokenization_kwargs: Optional[dict[str, Any]] = None,
@@ -310,6 +313,8 @@ class Processor:
         return decoder_inputs.get("prompt"), EngineCoreRequest(
             request_id=request_id,
             prompt_token_ids=decoder_inputs["prompt_token_ids"],
+            his_emb=his_emb,
+            task_emb=task_emb,
             mm_inputs=sorted_mm_inputs,
             mm_hashes=sorted_mm_hashes,
             mm_placeholders=sorted_mm_positions,
