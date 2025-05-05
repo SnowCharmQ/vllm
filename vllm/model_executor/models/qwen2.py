@@ -488,11 +488,9 @@ class Qwen2ForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
 class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
         super().__init__(vllm_config=vllm_config, prefix=prefix)
-        self.inst_token_id = 151665
-        self.spc_token_id = 151666
+        self.his_token_ids = [151665, 151666, 151667, 151668, 151669, 151670, 151671, 151672]
         self.emb_hidden_size = 1024
         self.align_mlp_his = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
-        self.align_mlp_inst = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
         self.inst_token = nn.Parameter(torch.rand((1, self.emb_hidden_size), dtype=torch.bfloat16))
     
     def forward(
@@ -502,24 +500,15 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         intermediate_tensors: Optional[IntermediateTensors] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
         his_emb: Optional[torch.Tensor] = None,
-        task_emb: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
         inputs_embeds = self.get_input_embeddings(input_ids)
-        if his_emb is not None and task_emb is not None:
+        if his_emb is not None:
+            his_emb = his_emb / (his_emb.norm(dim=-1, keepdim=True) + 1e-6)
             his_emb = his_emb.to(inputs_embeds.dtype)
-            task_emb = task_emb.to(inputs_embeds.dtype)
-            task_emb = task_emb.squeeze(1)
-            task_emb = task_emb.unsqueeze(-1)
-            his_emb_align = self.align_mlp_his(his_emb)
-            his_weights = torch.bmm(his_emb, task_emb)
-            his_weights = nn.functional.softmax(his_weights, dim=1)
-            profile_emb = torch.bmm(torch.transpose(his_emb_align, 1, 2), his_weights).squeeze(-1)
-            inst_emb = self.align_mlp_inst(self.inst_token)
+            his_emb = self.align_mlp_his(his_emb)
             for i in range(len(input_ids)):
-                if input_ids[i] == self.inst_token_id:
-                    inputs_embeds[i] = inst_emb[0]
-                elif input_ids[i] == self.spc_token_id:
-                    inputs_embeds[i] = profile_emb[i]
+                if input_ids[i] in self.his_token_ids:
+                    inputs_embeds[i] = his_emb[i][self.his_token_ids.index(input_ids[i])]
         hidden_states = self.model(input_ids, positions, intermediate_tensors,
                                    inputs_embeds)
         return hidden_states
