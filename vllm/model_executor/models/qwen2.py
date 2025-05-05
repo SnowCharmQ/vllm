@@ -514,8 +514,6 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
     ) -> Union[torch.Tensor, IntermediateTensors]:
         inputs_embeds = self.get_input_embeddings(input_ids)
         if his_emb is not None and task_emb is not None:
-            print(his_emb.shape, "his_emb.shape")
-            print(task_emb.shape, "task_emb.shape")
             his_emb = his_emb.to(inputs_embeds.dtype)
             task_emb = task_emb.to(inputs_embeds.dtype)
             task_emb = task_emb.squeeze(1)
@@ -525,10 +523,11 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
             his_weights = nn.functional.softmax(his_weights, dim=1)
             profile_emb = torch.bmm(torch.transpose(his_emb_align, 1, 2), his_weights).squeeze(-1)
             inst_emb = self.align_mlp_inst(self.inst_token)
-            profile_token_idx = input_ids == self.inst_token_id
-            inst_token_idx = input_ids == self.spc_token_id
-            inputs_embeds[profile_token_idx] = profile_emb
-            inputs_embeds[inst_token_idx] = inst_emb
+            for i in range(len(input_ids)):
+                if input_ids[i] == self.inst_token_id:
+                    inputs_embeds[i] = inst_emb[0]
+                elif input_ids[i] == self.spc_token_id:
+                    inputs_embeds[i] = profile_emb[i]
         hidden_states = self.model(input_ids, positions, intermediate_tensors,
                                    inputs_embeds)
         return hidden_states
