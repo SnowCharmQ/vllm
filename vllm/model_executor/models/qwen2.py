@@ -505,12 +505,21 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         task_emb: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
         inputs_embeds = self.get_input_embeddings(input_ids)
-        if his_emb is not None and task_emb is not None:
+        flag = False
+        for i in range(len(input_ids)):
+            if input_ids[i] == self.inst_token_id or input_ids[i] == self.spc_token_id:
+                flag = True
+                break
+        if his_emb is not None and task_emb is not None and flag:
             his_emb = his_emb.to(inputs_embeds.dtype)
             task_emb = task_emb.to(inputs_embeds.dtype)
             task_emb = task_emb.squeeze(1)
             task_emb = task_emb.unsqueeze(-1)
-            his_emb_align = self.align_mlp_his(his_emb)
+            his_emb_align = torch.zeros((len(input_ids), 512, self.config.hidden_size), 
+                                        device=his_emb.device, 
+                                        dtype=torch.bfloat16)
+            for b in range(0, len(input_ids), 32):
+                his_emb_align[b:b+32] = self.align_mlp_his(his_emb[b:b+32])
             his_weights = torch.bmm(his_emb, task_emb)
             his_weights = nn.functional.softmax(his_weights, dim=1)
             profile_emb = torch.bmm(torch.transpose(his_emb_align, 1, 2), his_weights).squeeze(-1)
