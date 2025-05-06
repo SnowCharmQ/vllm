@@ -488,7 +488,7 @@ class Qwen2ForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
 class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
         super().__init__(vllm_config=vllm_config, prefix=prefix)
-        self.his_token_ids = [151665, 151666, 151667, 151668, 151669, 151670, 151671, 151672]
+        self.his_token_ids = [151665 + i for i in range(64)]
         self.emb_hidden_size = 1024
         self.align_mlp_his = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
     
