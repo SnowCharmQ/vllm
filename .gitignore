@@ -209,3 +209,5 @@ csrc/moe/marlin_moe_wna16/kernel_*
 
 checkpoint*
 demo.py
+personal_model.py
+save_model.py
