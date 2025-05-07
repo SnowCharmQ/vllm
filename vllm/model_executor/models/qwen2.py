@@ -494,7 +494,7 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         self.l_diff_token_ids = [151681 + i for i in range(8)]
         self.align_mlp_his = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
         self.align_mlp_g_diff = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
-        self.align_mlp_l_diff = nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
+        self.align_mlp_l_diff = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
     
     def forward(
         self,
@@ -504,16 +504,34 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         inputs_embeds: Optional[torch.Tensor] = None,
         his_diff_emb: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
-        inputs_embeds = self.get_input_embeddings(input_ids)
+        inputs_embs = self.get_input_embeddings(input_ids)
         flag = False
         for i in range(len(input_ids)):
             if input_ids[i] in self.his_token_ids + self.g_diff_token_ids + self.l_diff_token_ids:
                 flag = True
                 break
         if his_diff_emb is not None and flag:
-            pass
+            his_emb = his_diff_emb[:, :8, :]
+            g_diff_emb = his_diff_emb[:, 8:16, :]
+            l_diff_emb = his_diff_emb[:, 16:, :]
+            his_emb = his_emb / (his_emb.norm(dim=-1, keepdim=True) + 1e-6)
+            g_diff_emb = g_diff_emb / (g_diff_emb.norm(dim=-1, keepdim=True) + 1e-6)
+            l_diff_emb = l_diff_emb / (l_diff_emb.norm(dim=-1, keepdim=True) + 1e-6)
+            his_emb = his_emb.to(inputs_embs.dtype)
+            g_diff_emb = g_diff_emb.to(inputs_embs.dtype)
+            l_diff_emb = l_diff_emb.to(inputs_embs.dtype)
+            his_emb = self.align_mlp_his(his_emb)
+            g_diff_emb = self.align_mlp_g_diff(g_diff_emb)
+            l_diff_emb = self.align_mlp_l_diff(l_diff_emb)
+            for i in range(len(input_ids)):
+                if input_ids[i] in self.his_token_ids:
+                    inputs_embs[i] = his_emb[i][self.his_token_ids.index(input_ids[i])]
+                elif input_ids[i] in self.g_diff_token_ids:
+                    inputs_embs[i] = g_diff_emb[i][self.g_diff_token_ids.index(input_ids[i])]
+                elif input_ids[i] in self.l_diff_token_ids:
+                    inputs_embs[i] = l_diff_emb[i][self.l_diff_token_ids.index(input_ids[i])]
         hidden_states = self.model(input_ids, positions, intermediate_tensors,
-                                   inputs_embeds)
+                                   inputs_embs)
         return hidden_states
 
 class Qwen2EmbeddingModel(nn.Module, SupportsLoRA, SupportsPP):
