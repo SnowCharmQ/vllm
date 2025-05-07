@@ -488,12 +488,13 @@ class Qwen2ForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
 class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
         super().__init__(vllm_config=vllm_config, prefix=prefix)
-        self.inst_token_id = 151665
-        self.spc_token_id = 151666
         self.emb_hidden_size = 1024
+        self.his_token_ids = [151665 + i for i in range(8)]
+        self.g_diff_token_ids = [151673 + i for i in range(8)]
+        self.l_diff_token_ids = [151681 + i for i in range(8)]
         self.align_mlp_his = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
-        self.align_mlp_inst = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
-        self.inst_token = nn.Parameter(torch.rand((1, self.emb_hidden_size), dtype=torch.bfloat16))
+        self.align_mlp_g_diff = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
+        self.align_mlp_l_diff = nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
     
     def forward(
         self,
@@ -501,30 +502,16 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         positions: torch.Tensor,
         intermediate_tensors: Optional[IntermediateTensors] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
-        his_emb: Optional[torch.Tensor] = None,
-        task_emb: Optional[torch.Tensor] = None,
+        his_diff_emb: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
         inputs_embeds = self.get_input_embeddings(input_ids)
         flag = False
         for i in range(len(input_ids)):
-            if input_ids[i] == self.inst_token_id or input_ids[i] == self.spc_token_id:
+            if input_ids[i] in self.his_token_ids + self.g_diff_token_ids + self.l_diff_token_ids:
                 flag = True
                 break
-        if his_emb is not None and task_emb is not None and flag:
-            his_emb = his_emb.to(inputs_embeds.dtype)
-            task_emb = task_emb.to(inputs_embeds.dtype)
-            task_emb = task_emb.squeeze(1)
-            task_emb = task_emb.unsqueeze(-1)
-            his_emb_align = self.align_mlp_his(his_emb)
-            his_weights = torch.bmm(his_emb, task_emb)
-            his_weights = nn.functional.softmax(his_weights, dim=1)
-            profile_emb = torch.bmm(torch.transpose(his_emb_align, 1, 2), his_weights).squeeze(-1)
-            inst_emb = self.align_mlp_inst(self.inst_token)
-            for i in range(len(input_ids)):
-                if input_ids[i] == self.inst_token_id:
-                    inputs_embeds[i] = inst_emb[0]
-                elif input_ids[i] == self.spc_token_id:
-                    inputs_embeds[i] = profile_emb[i]
+        if his_diff_emb is not None and flag:
+            pass
         hidden_states = self.model(input_ids, positions, intermediate_tensors,
                                    inputs_embeds)
         return hidden_states

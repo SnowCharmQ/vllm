@@ -22,8 +22,7 @@ class Request:
         self,
         request_id: str,
         prompt_token_ids: list[int],
-        his_emb: Optional[torch.Tensor],
-        task_emb: Optional[torch.Tensor],
+        his_diff_emb: Optional[torch.Tensor],
         multi_modal_inputs: Optional[list[MultiModalKwargs]],
         multi_modal_hashes: Optional[list[str]],
         multi_modal_placeholders: Optional[list[PlaceholderRange]],
@@ -40,8 +39,7 @@ class Request:
         self.eos_token_id = eos_token_id
         self.lora_request = lora_request
         self.structured_output_request = structured_output_request
-        self.his_emb = his_emb
-        self.task_emb = task_emb
+        self.his_diff_emb = his_diff_emb
 
         self.status = (RequestStatus.WAITING_FOR_FSM
                        if sampling_params.guided_decoding is not None else
@@ -87,8 +85,7 @@ class Request:
         return cls(
             request_id=request.request_id,
             prompt_token_ids=request.prompt_token_ids,
-            his_emb=request.his_emb,
-            task_emb=request.task_emb,
+            his_diff_emb=request.his_diff_emb,
             multi_modal_inputs=request.mm_inputs,
             multi_modal_hashes=request.mm_hashes,
             multi_modal_placeholders=request.mm_placeholders,
