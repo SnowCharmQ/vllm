@@ -215,7 +215,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         self.positions = torch.zeros(self.max_num_tokens,
                                      dtype=torch.int64,
                                      device=self.device)
-        self.his_diff_emb = torch.zeros((self.max_num_tokens, 24, 1024),
+        self.his_diff_emb = torch.zeros((self.max_num_tokens, 16, 1024),
                                      dtype=torch.float16,
                                      device=self.device)
         # None in the first PP rank. The rest are set after load_model.
@@ -506,7 +506,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
 
         # Get the number of scheduled tokens for each request.
         num_scheduled_tokens = np.empty(num_reqs, dtype=np.int32)
-        req_his_diff_embs = torch.zeros((num_reqs, 24, 1024),
+        req_his_diff_embs = torch.zeros((num_reqs, 16, 1024),
                                         dtype=torch.bfloat16)
         max_num_scheduled_tokens = 0
         for i, req_id in enumerate(self.input_batch.req_ids):
