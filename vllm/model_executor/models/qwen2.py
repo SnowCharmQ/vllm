@@ -495,6 +495,9 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         self.align_mlp_his = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
         self.align_mlp_g_diff = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
         self.align_mlp_l_diff = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
+        self.his_scale = nn.Parameter(torch.tensor(1.0, dtype=torch.bfloat16), requires_grad=True)
+        self.g_diff_scale = nn.Parameter(torch.tensor(1.0, dtype=torch.bfloat16), requires_grad=True)
+        self.l_diff_scale = nn.Parameter(torch.tensor(10.0, dtype=torch.bfloat16), requires_grad=True)
     
     def forward(
         self,
@@ -523,6 +526,9 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
             his_emb = self.align_mlp_his(his_emb)
             g_diff_emb = self.align_mlp_g_diff(g_diff_emb)
             l_diff_emb = self.align_mlp_l_diff(l_diff_emb)
+            his_emb = his_emb * self.his_scale
+            g_diff_emb = g_diff_emb * self.g_diff_scale
+            l_diff_emb = l_diff_emb * self.l_diff_scale
             for i in range(len(input_ids)):
                 if input_ids[i] in self.his_token_ids:
                     inputs_embs[i] = his_emb[i][self.his_token_ids.index(input_ids[i])]
