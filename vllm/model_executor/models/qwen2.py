@@ -500,23 +500,9 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         positions: torch.Tensor,
         intermediate_tensors: Optional[IntermediateTensors] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
-        his_emb: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
-        inputs_embs = self.get_input_embeddings(input_ids)
-        flag = False
-        for i in range(len(input_ids)):
-            if input_ids[i] in self.his_token_ids + self.diff_token_ids:
-                flag = True
-                break
-        if his_emb is not None and flag:
-            his_emb = his_emb / (his_emb.norm(dim=-1, keepdim=True) + 1e-6)
-            his_emb = his_emb.to(inputs_embs.dtype)
-            his_emb = self.align_mlp_his(his_emb)
-            for i in range(len(input_ids)):
-                if input_ids[i] in self.his_token_ids:
-                    inputs_embs[i] = his_emb[i][self.his_token_ids.index(input_ids[i])]
         hidden_states = self.model(input_ids, positions, intermediate_tensors,
-                                   inputs_embs)
+                                   inputs_embeds)
         return hidden_states
 
 class Qwen2EmbeddingModel(nn.Module, SupportsLoRA, SupportsPP):

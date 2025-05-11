@@ -437,7 +437,6 @@ class Gemma2ForCausalPersonalLM(Gemma2ForCausalLM):
         positions: torch.Tensor,
         intermediate_tensors: Optional[IntermediateTensors] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
-        his_emb: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
         inputs_embeds = self.get_input_embeddings(input_ids)
         hidden_states = self.model(input_ids, positions, intermediate_tensors,
