@@ -197,7 +197,7 @@ class Processor:
         request_id: str,
         prompt: PromptType,
         params: Union[SamplingParams, PoolingParams],
-        his_diff_emb: Optional[torch.Tensor] = None,
+        his_emb: Optional[torch.Tensor] = None,
         arrival_time: Optional[float] = None,
         lora_request: Optional[LoRARequest] = None,
         tokenization_kwargs: Optional[dict[str, Any]] = None,
@@ -312,7 +312,7 @@ class Processor:
         return decoder_inputs.get("prompt"), EngineCoreRequest(
             request_id=request_id,
             prompt_token_ids=decoder_inputs["prompt_token_ids"],
-            his_diff_emb=his_diff_emb,
+            his_emb=his_emb,
             mm_inputs=sorted_mm_inputs,
             mm_hashes=sorted_mm_hashes,
             mm_placeholders=sorted_mm_positions,
