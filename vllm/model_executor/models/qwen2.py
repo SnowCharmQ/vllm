@@ -489,10 +489,8 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
         super().__init__(vllm_config=vllm_config, prefix=prefix)
         self.emb_hidden_size = 1024
-        self.his_token_ids = [151665 + i for i in range(8)]
-        self.diff_token_ids = [151673 + i for i in range(8)]
-        self.align_mlp_his = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
-        self.align_mlp_diff = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
+        self.user_token_id = 151665
+        self.align_mlp = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
     
     def forward(
         self,
@@ -500,28 +498,16 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         positions: torch.Tensor,
         intermediate_tensors: Optional[IntermediateTensors] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
-        his_diff_emb: Optional[torch.Tensor] = None,
+        user_embed: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
         inputs_embs = self.get_input_embeddings(input_ids)
-        flag = False
-        for i in range(len(input_ids)):
-            if input_ids[i] in self.his_token_ids + self.diff_token_ids:
-                flag = True
-                break
-        if his_diff_emb is not None and flag:
-            his_emb = his_diff_emb[:, :8, :]
-            diff_emb = his_diff_emb[:, 8:, :]
-            his_emb = his_emb / (his_emb.norm(dim=-1, keepdim=True) + 1e-6)
-            diff_emb = diff_emb / (diff_emb.norm(dim=-1, keepdim=True) + 1e-6)
-            his_emb = his_emb.to(inputs_embs.dtype)
-            diff_emb = diff_emb.to(inputs_embs.dtype)
-            his_emb = self.align_mlp_his(his_emb)
-            diff_emb = self.align_mlp_diff(diff_emb)
+        if user_embed is not None:
+            user_embed = user_embed[:, :]
+            user_embed = user_embed.to(inputs_embs.dtype)
+            user_embed = self.align_mlp(user_embed)
             for i in range(len(input_ids)):
-                if input_ids[i] in self.his_token_ids:
-                    inputs_embs[i] = his_emb[i][self.his_token_ids.index(input_ids[i])]
-                elif input_ids[i] in self.diff_token_ids:
-                    inputs_embs[i] = diff_emb[i][self.diff_token_ids.index(input_ids[i])]
+                if input_ids[i] == self.user_token_id:
+                    inputs_embs[i] = user_embed[i]
         hidden_states = self.model(input_ids, positions, intermediate_tensors,
                                    inputs_embs)
         return hidden_states
