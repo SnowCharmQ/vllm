@@ -488,11 +488,6 @@ class Qwen2ForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
 class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
         super().__init__(vllm_config=vllm_config, prefix=prefix)
-        self.emb_hidden_size = 1024
-        self.his_token_ids = [151665 + i for i in range(8)]
-        self.align_mlp_his = nn.Sequential(nn.Linear(self.emb_hidden_size, self.config.hidden_size * 4), 
-                                        nn.GELU(), 
-                                        nn.Linear(self.config.hidden_size * 4, self.config.hidden_size))
     
     def forward(
         self,
