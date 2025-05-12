@@ -81,7 +81,7 @@ class RequestState:
         output_kind: RequestOutputKind,
         prompt: Optional[str],
         prompt_token_ids: list[int],
-        his_diff_user_emb: Optional[torch.Tensor],
+        his_output_emb: Optional[torch.Tensor],
         logprobs_processor: LogprobsProcessor,
         detokenizer: IncrementalDetokenizer,
         max_tokens_param: Optional[int],
@@ -96,7 +96,7 @@ class RequestState:
         self.output_kind = output_kind
         self.prompt = prompt
         self.prompt_token_ids = prompt_token_ids
-        self.his_diff_user_emb = his_diff_user_emb
+        self.his_output_emb = his_output_emb
         self.prompt_len = len(prompt_token_ids)
         self.logprobs_processor = logprobs_processor
         self.detokenizer = detokenizer
@@ -129,7 +129,7 @@ class RequestState:
             output_kind=request.sampling_params.output_kind,
             prompt=prompt,
             prompt_token_ids=request.prompt_token_ids,
-            his_diff_user_emb=request.his_diff_user_emb,
+            his_output_emb=request.his_output_emb,
             logprobs_processor=LogprobsProcessor.from_new_request(
                 tokenizer=tokenizer,
                 request=request,
