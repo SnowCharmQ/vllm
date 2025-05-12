@@ -24,7 +24,7 @@ class CachedRequestState:
 
     req_id: str
     prompt_token_ids: list[int]
-    user_embed: Optional[torch.Tensor]
+    his_diff_user_emb: Optional[torch.Tensor]
     mm_inputs: list[MultiModalKwargs]
     mm_positions: list[PlaceholderRange]
     sampling_params: SamplingParams

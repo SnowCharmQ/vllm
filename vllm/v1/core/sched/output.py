@@ -23,7 +23,7 @@ class NewRequestData:
 
     req_id: str
     prompt_token_ids: list[int]
-    user_embed: Optional[torch.Tensor]
+    his_diff_user_emb: Optional[torch.Tensor]
     mm_inputs: list[MultiModalKwargs]
     mm_hashes: list[str]
     mm_positions: list[PlaceholderRange]
@@ -41,7 +41,7 @@ class NewRequestData:
         return cls(
             req_id=request.request_id,
             prompt_token_ids=request.prompt_token_ids,
-            user_embed=request.user_embed,
+            his_diff_user_emb=request.his_diff_user_emb,
             mm_inputs=request.mm_inputs,
             mm_hashes=request.mm_hashes,
             mm_positions=request.mm_positions,
@@ -63,7 +63,7 @@ class CachedRequestData:
     new_token_ids: list[int]
     new_block_ids: list[int]
     num_computed_tokens: int
-    user_embed: Optional[torch.Tensor]
+    his_diff_user_emb: Optional[torch.Tensor]
 
     @classmethod
     def from_request(
@@ -79,7 +79,7 @@ class CachedRequestData:
             new_token_ids=new_token_ids,
             new_block_ids=new_block_ids,
             num_computed_tokens=request.num_computed_tokens,
-            user_embed=request.user_embed,
+            his_diff_user_emb=request.his_diff_user_emb,
         )
 
 

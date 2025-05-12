@@ -51,7 +51,7 @@ class EngineCoreRequest(
 
     request_id: str
     prompt_token_ids: list[int]
-    user_embed: Optional[torch.Tensor]
+    his_diff_user_emb: Optional[torch.Tensor]
     mm_inputs: Optional[Sequence[Optional[MultiModalKwargs]]]
     mm_hashes: Optional[list[str]]
     mm_placeholders: Optional[list[PlaceholderRange]]
