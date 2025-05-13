@@ -491,8 +491,16 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         self.inst_token_id = 151665
         self.spc_token_id = 151666
         self.emb_hidden_size = 1024
-        self.align_mlp_his = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
-        self.align_mlp_inst = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
+        self.align_mlp_his = nn.Sequential(
+            nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
+            nn.GELU(),
+            nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
+        )
+        self.align_mlp_inst = nn.Sequential(
+            nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
+            nn.GELU(),
+            nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
+        )
         self.inst_token = nn.Parameter(torch.rand((1, self.emb_hidden_size), dtype=torch.bfloat16))
     
     def forward(
