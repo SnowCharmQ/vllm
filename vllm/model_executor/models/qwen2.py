@@ -491,8 +491,7 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         self.emb_hidden_size = 1024
         self.his_token_ids = [151665 + i for i in range(8)]
         self.output_token_id = 151673
-        self.align_mlp_his = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
-        self.align_mlp_output = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
+        self.align_mlp = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
     
     def forward(
         self,
@@ -504,12 +503,10 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
     ) -> Union[torch.Tensor, IntermediateTensors]:
         inputs_embs = self.get_input_embeddings(input_ids)
         if his_output_emb is not None:
+            his_output_emb = his_output_emb.to(inputs_embs.dtype)
+            his_output_emb = self.align_mlp(his_output_emb)
             his_emb = his_output_emb[:, :8, :]
             output_emb = his_output_emb[:, 8, :]
-            his_emb = his_emb.to(inputs_embs.dtype)
-            output_emb = output_emb.to(inputs_embs.dtype)
-            his_emb = self.align_mlp_his(his_emb)
-            output_emb = self.align_mlp_output(output_emb)
             for i in range(len(input_ids)):
                 if input_ids[i] in self.his_token_ids:
                     inputs_embs[i] = his_emb[i][self.his_token_ids.index(input_ids[i])]
