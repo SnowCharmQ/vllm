@@ -491,8 +491,17 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         self.emb_hidden_size = 1024
         self.his_token_ids = [151665 + i for i in range(8)]
         self.diff_token_ids = [151673 + i for i in range(8)]
-        self.align_mlp_his = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
-        self.align_mlp_diff = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
+        self.align_mlp_his = nn.Sequential(
+            nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
+            nn.GELU(),
+            nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
+        )
+        self.align_mlp_diff = nn.Sequential(
+            nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
+            nn.GELU(),
+            nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
+        )
+        self.inst_token = nn.Parameter(torch.zeros(self.config.hidden_size, dtype=torch.bfloat16))
     
     def forward(
         self,
