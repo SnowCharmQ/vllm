@@ -507,22 +507,14 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         inputs_embs = self.get_input_embeddings(input_ids)
         flag = False
         for i in range(len(input_ids)):
-            if input_ids[i] in self.his_token_ids + self.diff_token_ids:
+            if input_ids[i] in self.diff_token_ids:
                 flag = True
                 break
         if diff_emb is not None and flag:
-            his_emb = diff_emb[:, :8, :]
-            diff_emb = diff_emb[:, 8:, :]
-            his_emb = his_emb / (his_emb.norm(dim=-1, keepdim=True) + 1e-6)
-            diff_emb = diff_emb / (diff_emb.norm(dim=-1, keepdim=True) + 1e-6)
-            his_emb = his_emb.to(inputs_embs.dtype)
             diff_emb = diff_emb.to(inputs_embs.dtype)
-            his_emb = self.align_mlp_his(his_emb)
             diff_emb = self.align_mlp_diff(diff_emb)
             for i in range(len(input_ids)):
-                if input_ids[i] in self.his_token_ids:
-                    inputs_embs[i] = his_emb[i][self.his_token_ids.index(input_ids[i])]
-                elif input_ids[i] in self.diff_token_ids:
+                if input_ids[i] in self.diff_token_ids:
                     inputs_embs[i] = diff_emb[i][self.diff_token_ids.index(input_ids[i])]
         hidden_states = self.model(input_ids, positions, intermediate_tensors,
                                    inputs_embs)
