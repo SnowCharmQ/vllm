@@ -216,7 +216,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                                      dtype=torch.int64,
                                      device=self.device)
         self.his_diff_emb = torch.zeros((self.max_num_tokens, 16, 1024),
-                                     dtype=torch.float16,
+                                     dtype=torch.bfloat16,
                                      device=self.device)
         # None in the first PP rank. The rest are set after load_model.
         self.intermediate_tensors: Optional[IntermediateTensors] = None
