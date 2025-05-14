@@ -519,8 +519,6 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         if his_diff_emb is not None and flag:
             his_emb = his_diff_emb[:, :8, :]
             diff_emb = his_diff_emb[:, 8:, :]
-            his_emb = his_emb / (his_emb.norm(dim=-1, keepdim=True) + 1e-6)
-            diff_emb = diff_emb / (diff_emb.norm(dim=-1, keepdim=True) + 1e-6)
             his_emb = his_emb.to(inputs_embs.dtype)
             diff_emb = diff_emb.to(inputs_embs.dtype)
             his_emb = self.align_mlp_his(his_emb)
