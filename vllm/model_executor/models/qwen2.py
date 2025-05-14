@@ -501,7 +501,6 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
             nn.GELU(),
             nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
         )
-        self.inst_token = nn.Parameter(torch.zeros(self.config.hidden_size, dtype=torch.bfloat16))
     
     def forward(
         self,
