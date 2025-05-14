@@ -526,9 +526,6 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
             his_emb = his_diff_emb[:, :8, :]
             l_diff_emb = his_diff_emb[:, 8:16, :]
             g_diff_emb = his_diff_emb[:, 16:24, :]
-            his_emb = his_emb / (his_emb.norm(dim=-1, keepdim=True) + 1e-6)
-            l_diff_emb = l_diff_emb / (l_diff_emb.norm(dim=-1, keepdim=True) + 1e-6)
-            g_diff_emb = g_diff_emb / (g_diff_emb.norm(dim=-1, keepdim=True) + 1e-6)
             his_emb = his_emb.to(inputs_embs.dtype)
             l_diff_emb = l_diff_emb.to(inputs_embs.dtype)
             g_diff_emb = g_diff_emb.to(inputs_embs.dtype)
