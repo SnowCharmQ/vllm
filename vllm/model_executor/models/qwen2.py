@@ -489,8 +489,8 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
         super().__init__(vllm_config=vllm_config, prefix=prefix)
         self.emb_hidden_size = 1024
-        self.diff_token_ids = [151673 + i for i in range(8)]
-        self.align_mlp_diff = nn.Sequential(
+        self.his_token_ids = [151673 + i for i in range(8)]
+        self.align_mlp_his = nn.Sequential(
             nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
             nn.GELU(),
             nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
@@ -502,20 +502,20 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
         positions: torch.Tensor,
         intermediate_tensors: Optional[IntermediateTensors] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
-        diff_emb: Optional[torch.Tensor] = None,
+        his_emb: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
         inputs_embs = self.get_input_embeddings(input_ids)
         flag = False
         for i in range(len(input_ids)):
-            if input_ids[i] in self.diff_token_ids:
+            if input_ids[i] in self.his_token_ids:
                 flag = True
                 break
-        if diff_emb is not None and flag:
-            diff_emb = diff_emb.to(inputs_embs.dtype)
-            diff_emb = self.align_mlp_diff(diff_emb)
+        if his_emb is not None and flag:
+            his_emb = his_emb.to(inputs_embs.dtype)
+            his_emb = self.align_mlp_his(his_emb)
             for i in range(len(input_ids)):
-                if input_ids[i] in self.diff_token_ids:
-                    inputs_embs[i] = diff_emb[i][self.diff_token_ids.index(input_ids[i])]
+                if input_ids[i] in self.his_token_ids:
+                    inputs_embs[i] = his_emb[i][self.his_token_ids.index(input_ids[i])]
         hidden_states = self.model(input_ids, positions, intermediate_tensors,
                                    inputs_embs)
         return hidden_states

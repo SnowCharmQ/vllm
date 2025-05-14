@@ -215,7 +215,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         self.positions = torch.zeros(self.max_num_tokens,
                                      dtype=torch.int64,
                                      device=self.device)
-        self.diff_emb = torch.zeros((self.max_num_tokens, 8, 1024),
+        self.his_emb = torch.zeros((self.max_num_tokens, 8, 1024),
                                      dtype=torch.bfloat16,
                                      device=self.device)
         # None in the first PP rank. The rest are set after load_model.
@@ -350,7 +350,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             self.requests[req_id] = CachedRequestState(
                 req_id=req_id,
                 prompt_token_ids=new_req_data.prompt_token_ids,
-                diff_emb=new_req_data.diff_emb,
+                his_emb=new_req_data.his_emb,
                 mm_inputs=new_req_data.mm_inputs,
                 mm_positions=new_req_data.mm_positions,
                 sampling_params=sampling_params,
@@ -408,7 +408,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             # Update the cached states.
             num_computed_tokens = req_data.num_computed_tokens
             req_state.num_computed_tokens = num_computed_tokens
-            req_state.diff_emb = req_data.diff_emb
+            req_state.his_emb = req_data.his_emb
             # Add the sampled token(s) from the previous step (if any).
             # This doesn't include "unverified" tokens like spec decode tokens.
             num_new_tokens = (num_computed_tokens +
@@ -506,7 +506,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
 
         # Get the number of scheduled tokens for each request.
         num_scheduled_tokens = np.empty(num_reqs, dtype=np.int32)
-        req_diff_embs = torch.zeros((num_reqs, 8, 1024),
+        req_his_embs = torch.zeros((num_reqs, 8, 1024),
                                         dtype=torch.bfloat16)
         max_num_scheduled_tokens = 0
         for i, req_id in enumerate(self.input_batch.req_ids):
@@ -514,7 +514,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             num_scheduled_tokens[i] = num_tokens
             max_num_scheduled_tokens = max(max_num_scheduled_tokens,
                                            num_tokens)
-            req_diff_embs[i] = self.requests[req_id].diff_emb
+            req_his_embs[i] = self.requests[req_id].his_emb
 
         # Get request indices.
         # E.g., [2, 5, 3] -> [0, 0, 1, 1, 1, 1, 1, 2, 2, 2]
@@ -559,14 +559,14 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                            torch.from_numpy(token_indices),
                            out=self.input_ids_cpu[:total_num_scheduled_tokens])
         
-        diff_emb_indices_tensor = torch.tensor(req_indices, dtype=torch.long)
-        expanded_diff_emb_indices_tensor = torch.index_select(
-            req_diff_embs,
+        his_emb_indices_tensor = torch.tensor(req_indices, dtype=torch.long)
+        expanded_his_emb_indices_tensor = torch.index_select(
+            req_his_embs,
             dim=0,
-            index=diff_emb_indices_tensor
+            index=his_emb_indices_tensor
         )
-        self.diff_emb[:total_num_scheduled_tokens].copy_(
-            expanded_diff_emb_indices_tensor,
+        self.his_emb[:total_num_scheduled_tokens].copy_(
+            expanded_his_emb_indices_tensor,
             non_blocking=True
         )
         
@@ -1100,7 +1100,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             # multimodal models, it is not desirable for performance since
             # then the embedding layer is not included in the CUDA graph.
             input_ids = self.input_ids[:num_input_tokens]
-            diff_emb = self.diff_emb[:num_input_tokens]
+            his_emb = self.his_emb[:num_input_tokens]
             inputs_embeds = None
         if self.uses_mrope:
             positions = self.mrope_positions[:, :num_input_tokens]
@@ -1130,7 +1130,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                 positions=positions,
                 intermediate_tensors=intermediate_tensors,
                 inputs_embeds=inputs_embeds,
-                diff_emb=diff_emb,
+                his_emb=his_emb,
             )
 
         if self.use_aux_hidden_state_outputs:
