@@ -484,14 +484,38 @@ class Qwen2ForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
                            if self.config.tie_word_embeddings else None),
         )
         return loader.load_weights(weights)
+    
+EMBED_SIZE = 1024
+HIDDEN_SIZE = 512
+
+
+class SparseAutoEncoder(nn.Module):
+    def init(self, input_size, hidden_size):
+        super().init()
+        self.encoder = nn.Sequential(
+            nn.Linear(input_size, hidden_size, dtype=torch.bfloat16),
+            nn.GELU(),
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(hidden_size, input_size, dtype=torch.bfloat16),
+            nn.GELU(),
+        )
+        self.rho = 0.05
+        self.rho_hat = None
+
+    def forward(self, x):
+        z = self.encoder(x)
+        self.rho_hat = z.mean(dim=0)
+        x_recon = self.decoder(z)
+        return z, x_recon
 
 class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
         super().__init__(vllm_config=vllm_config, prefix=prefix)
-        self.emb_hidden_size = 1024
         self.his_token_ids = [151673 + i for i in range(8)]
+        self.sae = SparseAutoEncoder(EMBED_SIZE, HIDDEN_SIZE)
         self.align_mlp_his = nn.Sequential(
-            nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
+            nn.Linear(HIDDEN_SIZE, self.config.hidden_size, dtype=torch.bfloat16),
             nn.GELU(),
             nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
         )
@@ -511,11 +535,12 @@ class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
                 flag = True
                 break
         if his_emb is not None and flag:
-            his_emb = his_emb.to(inputs_embs.dtype)
-            his_emb = self.align_mlp_his(his_emb)
+            his_sparse_emb, _ = self.sae(his_emb)
+            his_sparse_emb = his_sparse_emb.to(inputs_embs.dtype)
+            his_sparse_emb = self.align_mlp_his(his_sparse_emb)
             for i in range(len(input_ids)):
                 if input_ids[i] in self.his_token_ids:
-                    inputs_embs[i] = his_emb[i][self.his_token_ids.index(input_ids[i])]
+                    inputs_embs[i] = his_sparse_emb[i][self.his_token_ids.index(input_ids[i])]
         hidden_states = self.model(input_ids, positions, intermediate_tensors,
                                    inputs_embs)
         return hidden_states
