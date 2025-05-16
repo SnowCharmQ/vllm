@@ -490,8 +490,8 @@ HIDDEN_SIZE = 512
 
 
 class SparseAutoEncoder(nn.Module):
-    def init(self, input_size, hidden_size):
-        super().init()
+    def __init__(self, input_size, hidden_size):
+        super().__init__()
         self.encoder = nn.Sequential(
             nn.Linear(input_size, hidden_size, dtype=torch.bfloat16),
             nn.GELU(),
