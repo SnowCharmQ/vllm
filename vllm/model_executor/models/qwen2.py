@@ -512,11 +512,10 @@ class SparseAutoEncoder(nn.Module):
 class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
         super().__init__(vllm_config=vllm_config, prefix=prefix)
-        self.emb_hidden_size = 1024
         self.diff_token_ids = [151673 + i for i in range(8)]
         self.sae = SparseAutoEncoder(EMBED_SIZE, HIDDEN_SIZE)
         self.align_mlp_diff = nn.Sequential(
-            nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
+            nn.Linear(HIDDEN_SIZE, self.config.hidden_size, dtype=torch.bfloat16),
             nn.GELU(),
             nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
         )
