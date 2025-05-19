@@ -422,14 +422,45 @@ class Gemma2ForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
         )
         return loader.load_weights(weights)
 
+EMBED_SIZE = 1024
+HIDDEN_SIZE = 512
+
+class SparseAutoEncoder(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear(input_size, hidden_size, dtype=torch.bfloat16),
+            nn.GELU(),
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(hidden_size, input_size, dtype=torch.bfloat16),
+            nn.GELU(),
+        )
+        self.rho = 0.05
+        self.rho_hat = None
+
+    def forward(self, x):
+        z = self.encoder(x)
+        self.rho_hat = z.mean(dim=0)
+        x_recon = self.decoder(z)
+        return z, x_recon
 
 class Gemma2ForCausalPersonalLM(Gemma2ForCausalLM):
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
         super().__init__(vllm_config=vllm_config, prefix=prefix)
-        self.emb_hidden_size = 1024
-        self.align_mlp_his = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
-        self.align_mlp_inst = nn.Linear(self.emb_hidden_size, self.config.hidden_size, dtype=torch.bfloat16)
-        self.inst_token = nn.Parameter(torch.rand((1, self.emb_hidden_size), dtype=torch.bfloat16))
+        self.his_token_ids = [256000 + i for i in range(8)]
+        self.diff_token_ids = [256008 + i for i in range(8)]
+        self.sae = SparseAutoEncoder(EMBED_SIZE, HIDDEN_SIZE)
+        self.align_mlp_his = nn.Sequential(
+            nn.Linear(HIDDEN_SIZE, self.config.hidden_size, dtype=torch.bfloat16),
+            nn.GELU(),
+            nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
+        )
+        self.align_mlp_diff = nn.Sequential(
+            nn.Linear(HIDDEN_SIZE, self.config.hidden_size, dtype=torch.bfloat16),
+            nn.GELU(),
+            nn.Linear(self.config.hidden_size, self.config.hidden_size, dtype=torch.bfloat16),
+        )
         
     def forward(
         self,
@@ -439,7 +470,25 @@ class Gemma2ForCausalPersonalLM(Gemma2ForCausalLM):
         inputs_embeds: Optional[torch.Tensor] = None,
         his_diff_emb: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
-        inputs_embeds = self.get_input_embeddings(input_ids)
+        inputs_embs = self.get_input_embeddings(input_ids)
+        flag = False
+        for i in range(len(input_ids)):
+            if input_ids[i] in self.his_token_ids + self.diff_token_ids:
+                flag = True
+                break
+        if his_diff_emb is not None and flag:
+            his_diff_sparse_emb, _ = self.sae(his_diff_emb)
+            his_emb = his_diff_sparse_emb[:, :8, :]
+            diff_emb = his_diff_sparse_emb[:, 8:, :]
+            his_emb = his_emb.to(inputs_embs.dtype)
+            diff_emb = diff_emb.to(inputs_embs.dtype)
+            his_emb = self.align_mlp_his(his_emb)
+            diff_emb = self.align_mlp_diff(diff_emb)
+            for i in range(len(input_ids)):
+                if input_ids[i] in self.his_token_ids:
+                    inputs_embs[i] = his_emb[i][self.his_token_ids.index(input_ids[i])]
+                elif input_ids[i] in self.diff_token_ids:
+                    inputs_embs[i] = diff_emb[i][self.diff_token_ids.index(input_ids[i])]
         hidden_states = self.model(input_ids, positions, intermediate_tensors,
-                                   inputs_embeds)
+                                   inputs_embs)
         return hidden_states
