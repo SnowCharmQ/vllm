@@ -512,7 +512,7 @@ class SparseAutoEncoder(nn.Module):
         return z, x_recon
     
 
-class Qwen2ForCausalPersonalLM(Qwen2ForCausalLM):
+class DEPModel(Qwen2ForCausalLM):
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
         super().__init__(vllm_config=vllm_config, prefix=prefix)
         self.his_token_ids = [151665 + i for i in range(8)]
